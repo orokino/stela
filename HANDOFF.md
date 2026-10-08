@@ -1,0 +1,143 @@
+# Stela — clean Pi-fork handoff
+
+## Start here
+
+The fork decision is made. This workspace is the source checkout for
+[orokino/stela](https://github.com/orokino/stela), a public GitHub fork of
+[earendil-works/pi](https://github.com/earendil-works/pi). Begin the next session from this fork,
+then reverse engineer selected capabilities and implement them cleanly. Do not restart the
+prototype eval or automatically port `claudeish-pi`.
+
+The Claude-compatible prototype is **only a proof of concept**. Preserve its findings and evidence
+privately for later use; it is not Stela's implementation or a dependency to inline into this fork.
+No recovered proprietary code, prompts, strings, or assets have been added to the fork's tracked files.
+
+## Baseline
+
+- Forked upstream `main` at `6fb2e7815167e6b19006fc526d1a5d0f5f998787`
+  (`fix: support npm 12 pack JSON output (#10680)`). The coding-agent package is **1.1.0**;
+  this is upstream main, not the `v1.1.0` release-tag checkout.
+- Branch: `main`. `origin`: `git@github.com:orokino/stela.git`.
+  `upstream`: `https://github.com/earendil-works/pi.git`. Upstream history, MIT license, and
+  attribution are retained. Keep a small, ordered Stela patch stack.
+- Runtime source, package names, launcher, and persistence remain upstream Pi. There is no
+  Stela executable, isolated default state directory, theme implementation, or binary release yet.
+  Current setup changes are documentation and exclusions for private local research only.
+- Entry points: `packages/coding-agent/` (CLI, tools, session integration, docs),
+  `packages/agent/` (agent runtime), `packages/ai/` (providers/model data),
+  `packages/tui/` (terminal UI). `./pi-test.sh` launches this checkout from source;
+  a plain `pi` command launches the separate globally installed package.
+
+## Agreed direction
+
+Stela is a model-agnostic coding agent: CLI/TUI first, desktop GUI later. Select the best behavior
+from the studied harnesses, rather than reproducing an entire upstream personality.
+**No runtime personas:** one behavior per capability, with source, rationale, and rejected alternatives
+recorded; adjudicate conflicts once in writing.
+
+The fork is for ownership of the runtime and UI, not a startup-speed claim. Intended packaging is
+one native executable with its own `~/.stela/agent` state. Implement isolation before using the fork
+as Stela against personal state. Keep inherited persistence initially; defer a Stela SQLite migration,
+the desktop GUI, and the seven-target reverse-engineering sweep.
+
+### Frozen visual tokens — shared by eventual TUI and GUI
+
+Near-black canvas; greyscale carries structure; color is rationed to action and status.
+
+```text
+surface-0 #0B0B0C   surface-1 #111114   surface-2 #17171B   hairline #26262C (1px, no glow)
+fg #E8E8EA   muted #9A9AA2   dim #6A6A73
+accent.base #6E76FF   hover #858DFF   pressed #5860E8   border #5157A8   ghost #181A30 + 1px accent bar
+on-accent #0B0B0C            (white on #6E76FF is 3.7:1 and fails AA)
+status: success #3FB950   warning #D29922   error #F85149   diff-add #2EA043   diff-del #DA3633
+focus ring: 1px accent + 1px #0B0B0C separator (mandatory inside diff rows), no halo
+rule: accent for ACTIONS only (caret, active tool, focus ring, primary button); status colours only for state
+```
+
+Aster Iris base has 5.34:1 contrast on the canvas. `accent.ghost` is not enough by itself:
+use its accent bar or reverse video. Terminal fallback: ANSI 69 base, 60 border;
+truecolor only when `$COLORTERM` indicates `truecolor` or `24bit`.
+
+## Verified checkout setup
+
+Dependencies installed with `npm ci --ignore-scripts --no-audit --no-fund` on Node 22.23.2 / npm 12.0.2.
+A fresh checkout lacks `packages/ai/src/providers/data/.manifest.json`; it must hydrate model data
+before the source launcher can run. The smoke used the immutable catalog pinned by
+`nix/model-catalog.json`, verified its SHA-256, then ran the existing catalog hydrator.
+No source or dependency-lock change was needed.
+
+Reproduce the same setup from the repository root:
+
+```bash
+npm ci --ignore-scripts --no-audit --no-fund
+mkdir -p .artifacts/stela-bootstrap
+curl -fL 'https://pi.dev/api/models/revisions/sha256-439c53478c84ed27a58f8b54e1c3bd45810e5a969515b4e3666a3898d51ee22f?types=chat,image,classifier' \
+  -o .artifacts/stela-bootstrap/models.all.json
+printf '%s  %s\n' '439c53478c84ed27a58f8b54e1c3bd45810e5a969515b4e3666a3898d51ee22f' \
+  '.artifacts/stela-bootstrap/models.all.json' | sha256sum -c -
+node packages/ai/scripts/hydrate-model-catalog.ts .artifacts/stela-bootstrap/models.all.json
+npm run check:model-data
+./pi-test.sh --version
+./pi-test.sh --help
+```
+
+Observed: model-data check passed; source version printed `1.1.0`; help printed successfully.
+An offline RPC smoke with a temporary `PI_CODING_AGENT_DIR`, `--no-session`, disabled discovery,
+and no project approval passed `get_state` → real `bash` execution of `printf stela-fork-smoke` →
+updated context (`messageCount=1`) → orderly stdin-close shutdown. No model call or personal-state
+migration was performed. Local smoke output: `.artifacts/stela-bootstrap/rpc-smoke.json`.
+No standalone build, full test suite, or interactive TUI verification was performed in this setup session.
+
+Known upstream setup warnings: Gondolin's example dependency wants Node >=23.6.0; autoevals asks for
+pnpm. npm installation completed despite those engine warnings. The source launcher emits Node's
+experimental SQLite warning; the exercised source CLI/RPC paths still pass. Do not suppress or
+reinterpret that warning as a new Stela persistence implementation.
+
+## Private Claude findings and proof-of-concept archive
+
+Private backup directory: **`/home/claudio/stela-private-20261008.yW4Lf5/`** (mode 0700).
+Its `README.md` indexes the evidence and safe recovery commands; `SHA256SUMS` records the digest of
+`claude-proof-of-concept.tar.zst` (mode 0600). Archive integrity and comparison against original files
+passed before this handoff replaced the old one. The old, detailed handoff is in that archive.
+Dependency installations and Git metadata are excluded; original working files remain in place.
+
+| Original local location | Retained information |
+|---|---|
+| `/home/claudio/projects/claudeish-pi/` | Proof-of-concept source/tests, recovered data, extraction scripts, `docs/PARITY.md`, `docs/FEATURES.md`, `docs/INTERFACES.md`, ten per-surface specs in `docs/re/` |
+| `/home/claudio/projects/test/claude-code-harness-re/` | Claude Code report, provenance, behavior specifications, asset index |
+| `/home/claudio/cc-re/` | Extraction toolchain, recovered file trees and manifests, assets, runtime captures, supporting indices |
+| Local `docs/research/` and `eval/` | Visual-design research, spike/eval documentation, task fixtures, results, and raw captures |
+
+Root `eval/`, `docs/research/`, and `graphify-out/` are local-only and ignored by Git.
+Do not stage them or publish the private archive. Proprietary material remains private until its
+redistribution rights are reviewed; provenance is not permission. Future implementations should use
+reviewed behavioral specifications, not copied recovered implementations or prompt tables.
+
+Historical measurement takeaways, not benchmarks of this new source checkout:
+
+- Installed Pi 1.1.0 startup: bare 313 ms; prototype via loader 481 ms; matched inlined variant 422 ms
+  (about 57 ms saved). The old ~660 ms empty-extension premise did not reproduce.
+- The proof of concept exercised tool execution, streaming, cancellation, and session resume.
+  Its headless runs required `bypassPermissions`; none of that code is imported into this fork.
+- Eval results are qualified evidence, not SOTA proof. A paid-model batch inherited ambient context;
+  two free-preview stock/Step runs read a hidden verifier. Preserve these caveats with the captures.
+  Do not spend the next session re-running the same small set; fix visibility boundaries before any
+  future held-out comparison.
+
+## Next session — reverse engineering and building
+
+1. Start from this checkout and this handoff. Choose the first concrete Stela capability and inspect
+   the corresponding Pi runtime path. Implement Stela identity/launch/state isolation as the first
+   runtime cutover; keep normal Pi tooling and package names until a deliberate change requires more.
+2. Reverse engineer only the selected missing behavior, using private Claude findings where relevant
+   and a pinned, licensed source target such as Codex or Opencode for comparison. Record evidence,
+   uncertainty, redistribution status, and the chosen behavior; do not start a seven-target sweep.
+3. Implement the chosen behavior cleanly in the fork, update callers and relevant docs, and exercise
+   the actual CLI/TUI path. Apply the frozen visual tokens when UI work begins. No automatic prototype
+   port, recovered prompt import, extension inlining, GUI launch, or SQLite migration.
+
+Suggested opening prompt:
+
+> Stela. Read HANDOFF.md. Continue from the clean Pi fork, not claudeish-pi. Begin the first
+> runtime cutover for Stela identity and isolated state, then reverse engineer and implement
+> selected capabilities from reviewed evidence. Keep the prototype and recovered material private.

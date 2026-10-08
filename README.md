@@ -1,3 +1,20 @@
+# Stela
+
+Stela is a model-agnostic coding agent, starting from a clean fork of
+[earendil-works/pi](https://github.com/earendil-works/pi). CLI and TUI first; desktop GUI later.
+
+Start with [HANDOFF.md](HANDOFF.md) for the fork baseline, decisions, and next-session instructions.
+The Claude-compatible prototype is a separate proof of concept, not Stela's implementation.
+Recovered proprietary code, prompts, strings, and assets are not included in this fork.
+Future capabilities will be implemented from reviewed behavioral findings, with one behavior per
+capability and its source and rationale recorded.
+
+The runtime, package names, state directory, and build tooling remain upstream Pi for now.
+The Pi documentation below describes the current inherited implementation, not completed Stela work.
+Upstream history, MIT licensing, and attribution are retained.
+
+---
+
 <p align="center">
   <a href="https://pi.dev">
     <img alt="pi logo" src="https://pi.dev/logo-auto.svg" width="128">

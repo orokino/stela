@@ -45,3 +45,10 @@ plans/
 .pi/hf-sessions-backup/
 collect.sh
 packages/agent/docs/extensions/pi-server-artifact/index.md
+
+# Private pre-fork research and proof-of-concept evidence (never publish).
+/eval/
+/docs/research/
+/graphify-out/
+/.graphify_root
+/.rebuild.lock
