@@ -9,7 +9,7 @@ PI_EXPERIMENTAL=1 ./pi-test.sh server
 PI_EXPERIMENTAL=1 ./pi-test.sh client
 ```
 
-`PI_SERVER_DIR` overrides the server profile and socket directory, which defaults to `~/.pi/server`. `PI_SERVER_ID` selects the logical server ID when `--server-id` is omitted. The server, client, and experimental package subpaths are excluded from npm packages and standalone binaries.
+`STELA_SERVER_DIR` overrides the server profile and socket directory, which defaults to `~/.stela/server`. `STELA_SERVER_ID` selects the logical server ID when `--server-id` is omitted. The corresponding Pi overrides are ignored. The server, client, and experimental package subpaths are excluded from npm packages and standalone binaries. The installed `stela` command launches the regular CLI; use the source commands above for experimental client/server work.
 
 | Scope | Service | Current slice | Continuation point |
 |---|---|---|---|

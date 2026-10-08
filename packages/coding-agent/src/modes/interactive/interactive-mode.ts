@@ -1010,10 +1010,11 @@ export class InteractiveMode {
 			const showDetails = this.shouldShowStartupDetails();
 			// Built on demand so the header follows theme changes. The logo's first line carries the version,
 			// its second line the first line of key hints. Terminals that cannot render the logo get a
-			// "Pi vX" line instead, with the key hints below it.
-			const showLogo = supportsPiLogo();
+			// app-name line instead, with the key hints below it. Forks do not display Pi's logo.
+			const showLogo = APP_NAME === "pi" && supportsPiLogo();
 			const withLogo = (hints: string) => {
-				if (!showLogo) return `${piWordmark()} ${theme.fg("dim", `v${this.version}`)}\n${hints}`;
+				if (!showLogo)
+					return `${APP_NAME === "pi" ? piWordmark() : theme.bold(APP_TITLE)} ${theme.fg("dim", `v${this.version}`)}\n${hints}`;
 				const [top, bottom] = piLogoLines();
 				return `${top} ${theme.fg("dim", `v${this.version}`)}\n${bottom} ${hints}`;
 			};
@@ -1060,7 +1061,10 @@ export class InteractiveMode {
 					`Press ${keyText("app.tools.expand")} to show full startup help${showDetails ? " and loaded resources" : ""}.`,
 				);
 			const onboarding = () =>
-				theme.fg("dim", `Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.`);
+				theme.fg(
+					"dim",
+					`${APP_NAME} can explain its own features and look up its docs. Ask it how to use or extend ${APP_NAME}.`,
+				);
 			const header = new BuiltInHeader(
 				() => `${withLogo(compactInstructions())}\n${compactOnboarding()}\n\n${onboarding()}`,
 				() => `${withLogo(expandedInstructions())}\n\n${onboarding()}`,

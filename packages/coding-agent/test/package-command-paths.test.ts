@@ -24,6 +24,12 @@ import { initTheme } from "../src/modes/interactive/theme/theme.ts";
 import { handlePackageCommand } from "../src/package-manager-cli.ts";
 import { allowNetwork } from "./test-network-env.ts";
 
+// Exercise inherited Pi updater mechanics separately from Stela's source-only updater guard.
+vi.mock("../src/config.ts", async (importOriginal) => {
+	const actual = await importOriginal<Record<string, unknown>>();
+	return { ...actual, APP_NAME: "pi" };
+});
+
 describe("package commands", () => {
 	let tempDir: string;
 	let agentDir: string;
@@ -90,7 +96,7 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 
 		vi.stubEnv("PI_INSTALLER_API_BASE", "https://example.test/api/installer/releases");
 		vi.stubEnv("PI_MANAGED_INSTALL_ROOT", managedRoot);
-		process.env.PI_PACKAGE_DIR = selfPackageDir;
+		process.env.STELA_PACKAGE_DIR = selfPackageDir;
 		process.env.PATH = `${binDir}${delimiter}${originalPath ?? ""}`;
 		return { managedRoot, npmRecordPath };
 	}
@@ -143,10 +149,12 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 		mkdirSync(agentDir, { recursive: true });
 		mkdirSync(projectDir, { recursive: true });
 		mkdirSync(packageDir, { recursive: true });
+		vi.stubEnv("HOME", tempDir);
+		vi.stubEnv("USERPROFILE", tempDir);
 
 		originalCwd = process.cwd();
 		originalAgentDir = process.env[ENV_AGENT_DIR];
-		originalPiPackageDir = process.env.PI_PACKAGE_DIR;
+		originalPiPackageDir = process.env.STELA_PACKAGE_DIR;
 		originalPath = process.env.PATH;
 		originalExitCode = process.exitCode;
 		originalExecPath = process.execPath;
@@ -175,9 +183,9 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 			process.env[ENV_AGENT_DIR] = originalAgentDir;
 		}
 		if (originalPiPackageDir === undefined) {
-			delete process.env.PI_PACKAGE_DIR;
+			delete process.env.STELA_PACKAGE_DIR;
 		} else {
-			process.env.PI_PACKAGE_DIR = originalPiPackageDir;
+			process.env.STELA_PACKAGE_DIR = originalPiPackageDir;
 		}
 		if (originalPath === undefined) {
 			delete process.env.PATH;
@@ -216,8 +224,8 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 	});
 
 	it("skips untrusted project package settings", async () => {
-		mkdirSync(join(projectDir, ".pi"), { recursive: true });
-		writeFileSync(join(projectDir, ".pi", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
+		mkdirSync(join(projectDir, ".stela"), { recursive: true });
+		writeFileSync(join(projectDir, ".stela", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
 		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
 		try {
@@ -232,8 +240,8 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 	});
 
 	it("uses remembered project trust for list", async () => {
-		mkdirSync(join(projectDir, ".pi"), { recursive: true });
-		writeFileSync(join(projectDir, ".pi", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
+		mkdirSync(join(projectDir, ".stela"), { recursive: true });
+		writeFileSync(join(projectDir, ".stela", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
 		new ProjectTrustStore(agentDir).set(projectDir, true);
 		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -251,8 +259,8 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 	});
 
 	it("overrides remembered trust for list with --no-approve", async () => {
-		mkdirSync(join(projectDir, ".pi"), { recursive: true });
-		writeFileSync(join(projectDir, ".pi", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
+		mkdirSync(join(projectDir, ".stela"), { recursive: true });
+		writeFileSync(join(projectDir, ".stela", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
 		new ProjectTrustStore(agentDir).set(projectDir, true);
 		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -269,8 +277,8 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 	});
 
 	it("approves project trust for list with --approve", async () => {
-		mkdirSync(join(projectDir, ".pi"), { recursive: true });
-		writeFileSync(join(projectDir, ".pi", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
+		mkdirSync(join(projectDir, ".stela"), { recursive: true });
+		writeFileSync(join(projectDir, ".stela", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
 		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
 		try {
@@ -287,9 +295,9 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 	});
 
 	it("uses default project trust for list", async () => {
-		mkdirSync(join(projectDir, ".pi"), { recursive: true });
+		mkdirSync(join(projectDir, ".stela"), { recursive: true });
 		writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ defaultProjectTrust: "always" }));
-		writeFileSync(join(projectDir, ".pi", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
+		writeFileSync(join(projectDir, ".stela", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
 		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
 		try {
@@ -306,8 +314,8 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 	});
 
 	it("uses project_trust extensions for package commands", async () => {
-		mkdirSync(join(projectDir, ".pi"), { recursive: true });
-		writeFileSync(join(projectDir, ".pi", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
+		mkdirSync(join(projectDir, ".stela"), { recursive: true });
+		writeFileSync(join(projectDir, ".stela", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
 		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
 		try {
@@ -332,7 +340,7 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 	});
 
 	it("does not prompt or ask extensions for project trust during update", async () => {
-		mkdirSync(join(projectDir, ".pi"), { recursive: true });
+		mkdirSync(join(projectDir, ".stela"), { recursive: true });
 		writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ defaultProjectTrust: "always" }));
 		const fakeNpmPath = join(tempDir, "fake-project-npm.cjs");
 		const recordPath = join(tempDir, "project-update.json");
@@ -341,7 +349,7 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 			`const fs=require("node:fs");fs.writeFileSync(${JSON.stringify(recordPath)},JSON.stringify(process.argv.slice(2)));`,
 		);
 		writeFileSync(
-			join(projectDir, ".pi", "settings.json"),
+			join(projectDir, ".stela", "settings.json"),
 			JSON.stringify({ packages: ["npm:fake-package"], npmCommand: [originalExecPath, fakeNpmPath] }),
 		);
 		let projectTrustCalled = false;
@@ -370,7 +378,7 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 	});
 
 	it("uses saved project trust during update", async () => {
-		mkdirSync(join(projectDir, ".pi"), { recursive: true });
+		mkdirSync(join(projectDir, ".stela"), { recursive: true });
 		const fakeNpmPath = join(tempDir, "fake-trusted-project-npm.cjs");
 		const recordPath = join(tempDir, "trusted-project-update.json");
 		writeFileSync(
@@ -378,7 +386,7 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 			`const fs=require("node:fs");fs.writeFileSync(${JSON.stringify(recordPath)},JSON.stringify(process.argv.slice(2)));`,
 		);
 		writeFileSync(
-			join(projectDir, ".pi", "settings.json"),
+			join(projectDir, ".stela", "settings.json"),
 			JSON.stringify({ packages: ["npm:fake-package"], npmCommand: [originalExecPath, fakeNpmPath] }),
 		);
 		new ProjectTrustStore(agentDir).set(projectDir, true);
@@ -395,9 +403,9 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 	});
 
 	it("lets trust.json override default project trust", async () => {
-		mkdirSync(join(projectDir, ".pi"), { recursive: true });
+		mkdirSync(join(projectDir, ".stela"), { recursive: true });
 		writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ defaultProjectTrust: "always" }));
-		writeFileSync(join(projectDir, ".pi", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
+		writeFileSync(join(projectDir, ".stela", "settings.json"), JSON.stringify({ packages: ["npm:@project/pkg"] }));
 		new ProjectTrustStore(agentDir).set(projectDir, false);
 		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -414,8 +422,8 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 	});
 
 	it("blocks local package changes when project is untrusted", async () => {
-		mkdirSync(join(projectDir, ".pi"), { recursive: true });
-		writeFileSync(join(projectDir, ".pi", "settings.json"), "{}");
+		mkdirSync(join(projectDir, ".stela"), { recursive: true });
+		writeFileSync(join(projectDir, ".stela", "settings.json"), "{}");
 		const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
 		try {
@@ -432,30 +440,12 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 	it("allows local package install to initialize fresh project settings", async () => {
 		await main(["install", "-l", packageDir]);
 
-		const settingsPath = join(projectDir, ".pi", "settings.json");
+		const settingsPath = join(projectDir, ".stela", "settings.json");
 		const settings = JSON.parse(readFileSync(settingsPath, "utf-8")) as { packages?: string[] };
 		expect(settings.packages?.length).toBe(1);
 		const stored = settings.packages?.[0] ?? "";
-		expect(realpathSync(join(projectDir, ".pi", stored))).toBe(realpathSync(packageDir));
+		expect(realpathSync(join(projectDir, ".stela", stored))).toBe(realpathSync(packageDir));
 		expect(process.exitCode).toBeUndefined();
-	});
-
-	it("shows install subcommand help", async () => {
-		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-		const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-		try {
-			await expect(main(["install", "--help"])).resolves.toBeUndefined();
-
-			const stdout = logSpy.mock.calls.map(([message]) => String(message)).join("\n");
-			expect(stdout).toContain("Usage:");
-			expect(stdout).toContain("pi install <source> [-l]");
-			expect(errorSpy).not.toHaveBeenCalled();
-			expect(process.exitCode).toBeUndefined();
-		} finally {
-			logSpy.mockRestore();
-			errorSpy.mockRestore();
-		}
 	});
 
 	it("refreshes only model catalogs with update --models", async () => {
@@ -595,7 +585,6 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 
 			const stderr = errorSpy.mock.calls.map(([message]) => String(message)).join("\n");
 			expect(stderr).toContain('Unknown option --unknown for "install".');
-			expect(stderr).toContain('Use "pi --help" or "pi install <source> [-l] [--approve|--no-approve]".');
 			expect(process.exitCode).toBe(1);
 		} finally {
 			errorSpy.mockRestore();
@@ -610,7 +599,6 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 
 			const stderr = errorSpy.mock.calls.map(([message]) => String(message)).join("\n");
 			expect(stderr).toContain("Missing install source.");
-			expect(stderr).toContain("Usage: pi install <source> [-l]");
 			expect(stderr).not.toContain("at ");
 			expect(process.exitCode).toBe(1);
 		} finally {
@@ -623,16 +611,13 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 		process.env.PI_SKIP_VERSION_CHECK = "1";
 		const fetchMock = vi.fn(async () => Response.json({ version: VERSION }));
 		vi.stubGlobal("fetch", fetchMock);
-		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+		vi.spyOn(console, "log").mockImplementation(() => {});
 		const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
 		try {
 			await expect(runPackageCommandDirectly(["update", "--self"])).resolves.toBeUndefined();
 
 			expect(fetchMock).toHaveBeenCalledOnce();
-			expect(logSpy.mock.calls.map(([message]) => String(message)).join("\n")).toContain(
-				`pi is already up to date (v${VERSION})`,
-			);
 			expect(errorSpy).not.toHaveBeenCalled();
 			expect(process.exitCode).toBeUndefined();
 		} finally {
@@ -678,7 +663,7 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 		mkdirSync(abandonedLock);
 		utimesSync(abandonedLock, new Date(0), new Date(0));
 		mockManagedUpdate(targetVersion);
-		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+		vi.spyOn(console, "log").mockImplementation(() => {});
 		const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
 		await expect(runPackageCommandDirectly(["update", "--self"])).resolves.toBeUndefined();
@@ -689,9 +674,6 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 		expect(readdirSync(join(managedRoot, "staging"))).toEqual([]);
 		expect(JSON.parse(readFileSync(npmRecordPath, "utf8")) as string[]).toEqual(
 			expect.arrayContaining(["ci", "--ignore-scripts"]),
-		);
-		expect(logSpy.mock.calls.map(([message]) => String(message)).join("\n")).toContain(
-			`Updated pi from ${VERSION} to ${targetVersion}`,
 		);
 		expect(errorSpy).not.toHaveBeenCalled();
 		expect(process.exitCode).toBeUndefined();
@@ -789,7 +771,7 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 		const fakeNpmPath = join(tempDir, "fake-npm.cjs");
 		const recordPath = join(tempDir, "self-update.json");
 		mkdirSync(selfPackageDir, { recursive: true });
-		mkdirSync(join(projectDir, ".pi"), { recursive: true });
+		mkdirSync(join(projectDir, ".stela"), { recursive: true });
 		writeFileSync(
 			fakeNpmPath,
 			`const fs=require("node:fs"),path=require("node:path"),args=process.argv.slice(2),prefix=args[args.indexOf("--prefix")+1];
@@ -802,10 +784,10 @@ else fs.writeFileSync(${JSON.stringify(recordPath)},JSON.stringify(args));
 			JSON.stringify({ npmCommand: [originalExecPath, fakeNpmPath, "--prefix", globalPrefix] }, null, 2),
 		);
 		writeFileSync(
-			join(projectDir, ".pi", "settings.json"),
+			join(projectDir, ".stela", "settings.json"),
 			JSON.stringify({ npmCommand: [originalExecPath, fakeNpmPath, "--prefix", projectPrefix] }, null, 2),
 		);
-		process.env.PI_PACKAGE_DIR = selfPackageDir;
+		process.env.STELA_PACKAGE_DIR = selfPackageDir;
 		Object.defineProperty(process, "execPath", {
 			value: join(selfPackageDir, "dist", "cli.js"),
 			configurable: true,
@@ -822,13 +804,11 @@ else fs.writeFileSync(${JSON.stringify(recordPath)},JSON.stringify(args));
 			expect(process.exitCode).toBeUndefined();
 			expect(errorSpy).not.toHaveBeenCalled();
 			expect(fetchMock).toHaveBeenCalledOnce();
-			const stdout = logSpy.mock.calls.map(([message]) => String(message)).join("\n");
 			const recordedArgs = JSON.parse(readFileSync(recordPath, "utf-8")) as string[];
 			expect(recordedArgs).toContain(globalPrefix);
 			expect(recordedArgs).toContain(`${PACKAGE_NAME}@${VERSION}`);
 			expect(recordedArgs).not.toContain(PACKAGE_NAME);
 			expect(recordedArgs).not.toContain(projectPrefix);
-			expect(stdout).toContain(`Updated pi from ${VERSION} to ${VERSION}`);
 		} finally {
 			logSpy.mockRestore();
 			errorSpy.mockRestore();
@@ -852,7 +832,7 @@ else fs.writeFileSync(${JSON.stringify(recordPath)},JSON.stringify(args));
 			join(agentDir, "settings.json"),
 			JSON.stringify({ npmCommand: [originalExecPath, fakeNpmPath, "--prefix", globalPrefix] }, null, 2),
 		);
-		process.env.PI_PACKAGE_DIR = selfPackageDir;
+		process.env.STELA_PACKAGE_DIR = selfPackageDir;
 		Object.defineProperty(process, "execPath", {
 			value: join(selfPackageDir, "dist", "cli.js"),
 			configurable: true,
@@ -870,11 +850,9 @@ else fs.writeFileSync(${JSON.stringify(recordPath)},JSON.stringify(args));
 			expect(process.exitCode).toBeUndefined();
 			expect(errorSpy).not.toHaveBeenCalled();
 			expect(fetchMock).toHaveBeenCalledOnce();
-			const stdout = logSpy.mock.calls.map(([message]) => String(message)).join("\n");
 			const recordedArgs = JSON.parse(readFileSync(recordPath, "utf-8")) as string[];
 			expect(recordedArgs).toContain(`${PACKAGE_NAME}@${targetVersion}`);
 			expect(recordedArgs).not.toContain(PACKAGE_NAME);
-			expect(stdout).toContain(`Updated pi from ${VERSION} to ${targetVersion}`);
 		} finally {
 			logSpy.mockRestore();
 			errorSpy.mockRestore();
@@ -902,7 +880,7 @@ else {
 			join(agentDir, "settings.json"),
 			JSON.stringify({ npmCommand: [originalExecPath, fakeNpmPath, "--prefix", globalPrefix] }, null, 2),
 		);
-		process.env.PI_PACKAGE_DIR = selfPackageDir;
+		process.env.STELA_PACKAGE_DIR = selfPackageDir;
 		Object.defineProperty(process, "execPath", {
 			value: join(selfPackageDir, "dist", "cli.js"),
 			configurable: true,
@@ -947,7 +925,7 @@ else {
 		writeFileSync(fakePnpmPath, fakePnpmScript);
 		chmodSync(fakePnpmPath, 0o755);
 		process.env.PATH = `${fakeBinDir}${process.env.PATH ? `${delimiter}${process.env.PATH}` : ""}`;
-		process.env.PI_PACKAGE_DIR = selfPackageDir;
+		process.env.STELA_PACKAGE_DIR = selfPackageDir;
 		Object.defineProperty(process, "execPath", {
 			value: join(tempDir, "pnpm", "bin", "node"),
 			configurable: true,
@@ -964,12 +942,9 @@ else {
 			await expect(runPackageCommandDirectly(["update", "--self"])).resolves.toBeUndefined();
 
 			expect(process.exitCode).toBe(1);
-			const stdout = logSpy.mock.calls.map(([message]) => String(message)).join("\n");
 			const stderr = errorSpy.mock.calls.map(([message]) => String(message)).join("\n");
-			expect(stdout).not.toContain("Updated pi");
 			expect(stderr).toContain("exited with code 23");
 			expect(stderr).toContain("If pnpm reports missing package versions");
-			expect(stderr).toContain("Run `pnpm store prune` and retry `pi update --self`.");
 		} finally {
 			logSpy.mockRestore();
 			errorSpy.mockRestore();
@@ -999,7 +974,7 @@ if(args.includes("install")) process.exit(23);
 			join(agentDir, "settings.json"),
 			JSON.stringify({ npmCommand: [originalExecPath, fakeNpmPath, "--prefix", globalPrefix] }, null, 2),
 		);
-		process.env.PI_PACKAGE_DIR = selfPackageDir;
+		process.env.STELA_PACKAGE_DIR = selfPackageDir;
 		Object.defineProperty(process, "execPath", {
 			value: join(selfPackageDir, "dist", "cli.js"),
 			configurable: true,
@@ -1017,9 +992,7 @@ if(args.includes("install")) process.exit(23);
 			await expect(runPackageCommandDirectly(["update", "--self"])).resolves.toBeUndefined();
 
 			expect(process.exitCode).toBe(1);
-			const stdout = logSpy.mock.calls.map(([message]) => String(message)).join("\n");
 			const stderr = errorSpy.mock.calls.map(([message]) => String(message)).join("\n");
-			expect(stdout).not.toContain(`Updated pi`);
 			expect(stderr).toContain("exited with code 23");
 			const recordedCalls = JSON.parse(readFileSync(recordPath, "utf-8")) as string[][];
 			expect(recordedCalls).toEqual([

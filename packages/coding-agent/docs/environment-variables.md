@@ -1,10 +1,10 @@
 # Environment Variables
 
-Pi uses environment variables in three ways:
+Stela retains upstream environment controls except for its identity and state selectors:
 
-- Variables such as `PI_OFFLINE` configure the Pi process.
-- Pi sets process markers so child processes can identify Pi as the launching agent.
-- Commands run by the LLM-callable shell tools receive `PI_*` variables describing the current session.
+- Variables such as `PI_OFFLINE` configure inherited runtime behavior.
+- Stela sets process markers so child processes can identify the launching agent.
+- Commands run by the LLM-callable shell tools retain the `PI_*` session-metadata protocol.
 
 Provider API-key variables are documented separately in [Providers](providers.md#use-an-api-key-from-the-environment).
 
@@ -12,14 +12,14 @@ Provider API-key variables are documented separately in [Providers](providers.md
 
 The CLI and RPC entry points set two process markers:
 
-- `AI_AGENT=pi` is a generic marker that lets tooling identify Pi as the agent that launched the process.
-- `PI_CODING_AGENT=true` is Pi-specific and lets child processes detect that they run inside Pi.
+- `AI_AGENT=stela` identifies Stela as the agent that launched the process.
+- `STELA_CODING_AGENT=true` lets child processes detect that they run inside Stela.
 
-Child processes inherit both markers. They are not session-specific and are not set automatically when Pi is embedded through the SDK.
+Child processes inherit both markers. They are not session-specific and are not set automatically when Stela is embedded through the SDK. Stela does not set `PI_CODING_AGENT`; an already-inherited value is not a Stela identity marker.
 
 ## Shell Tool Session Environment
 
-Commands run by the `bash` and `powershell` tools receive the current Pi session state:
+Commands run by the `bash` and `powershell` tools receive current Stela session state under inherited variable names:
 
 | Variable | Description |
 |----------|-------------|
@@ -70,17 +70,17 @@ const powershellTool = createPowerShellTool(cwd, {
 });
 ```
 
-When disabled, Pi removes inherited values for these variables so nested Pi processes do not expose stale parent-session metadata.
+When disabled, Stela removes inherited values for these variables so nested agent processes do not expose stale parent-session metadata.
 
-## Pi Process Configuration
+## Stela Process Configuration
 
-These variables are read by Pi itself:
+These variables are read by Stela itself. The remaining `PI_*` names are inherited behavior controls, not Pi state-directory fallbacks:
 
 | Variable | Description |
 |----------|-------------|
-| `PI_CODING_AGENT_DIR` | Override the config directory; default is `~/.pi/agent` |
-| `PI_CODING_AGENT_SESSION_DIR` | Override session storage; overridden by `--session-dir` |
-| `PI_PACKAGE_DIR` | Override the package directory, useful for Nix/Guix store paths |
+| `STELA_CODING_AGENT_DIR` | Override the config directory; default is `~/.stela/agent` |
+| `STELA_CODING_AGENT_SESSION_DIR` | Override session storage; overridden by `--session-dir` |
+| `STELA_PACKAGE_DIR` | Override the package directory, useful for Nix/Guix store paths |
 | `PI_OFFLINE` | Disable automatic network activity, including model catalog refreshes |
 | `PI_SKIP_VERSION_CHECK` | Disable the `pi.dev` latest-version request |
 | `PI_TELEMETRY` | Override install/update telemetry and provider attribution headers: `1`/`true`/`yes` or `0`/`false`/`no` |
@@ -97,3 +97,9 @@ These variables are read by Pi itself:
 | `HTTP_PROXY`, `HTTPS_PROXY` | Proxy outbound HTTP requests |
 
 Provider credentials such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and provider-specific configuration are listed in [Providers](providers.md#use-an-api-key-from-the-environment).
+
+Pi's `PI_CODING_AGENT_DIR`, `PI_CODING_AGENT_SESSION_DIR`, and `PI_PACKAGE_DIR` do not
+select Stela state or package assets. Experimental source commands use `STELA_SERVER_DIR`
+(default `~/.stela/server`) and `STELA_SERVER_ID`, not the corresponding Pi overrides.
+Self-update and Pi managed-install cleanup are disabled for Stela; model-catalog and extension
+updates remain available.

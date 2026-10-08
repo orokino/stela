@@ -52,6 +52,7 @@ const MANAGED_INSTALL_MARKER = "managed-install.json";
 const MANAGED_RELEASE_VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 function getActiveManagedInstallRoot(): string | undefined {
+	if (APP_NAME !== "pi") return undefined;
 	const configuredRoot = process.env.PI_MANAGED_INSTALL_ROOT?.trim();
 	if (!configuredRoot) return undefined;
 
@@ -291,7 +292,7 @@ function getPackageCommandUsage(command: PackageCommand): string {
 		case "remove":
 			return `${APP_NAME} remove <source> [-l] [--approve|--no-approve]`;
 		case "update":
-			return `${APP_NAME} update [source|self|pi] [--self|--extensions|--models|--all] [--extension <source>] [--approve|--no-approve] [--force]`;
+			return `${APP_NAME} update [source|self|${APP_NAME}] [--self|--extensions|--models|--all] [--extension <source>] [--approve|--no-approve] [--force]`;
 		case "list":
 			return `${APP_NAME} list [--approve|--no-approve]`;
 	}
@@ -359,24 +360,26 @@ Examples:
 			console.log(`${chalk.bold("Usage:")}
   ${getPackageCommandUsage("update")}
 
-Update pi, installed packages, or model catalogs.
+Update ${APP_NAME}, installed packages, or model catalogs.
 
 Options:
-  --self                  Update pi only (default when no target is given)
+  --self                  Update ${APP_NAME} only (default when no target is given)
   --extensions            Update installed packages only
   --models                Refresh model catalogs only
-  --all                   Update pi and installed packages
+  --all                   Update ${APP_NAME} and installed packages
   --extension <source>    Update one package only
   -a, --approve           Trust project-local files for this command
   -na, --no-approve       Ignore project-local files for this command
-  --force                 Reinstall pi even if the current version is latest
+  --force                 Reinstall ${APP_NAME} even if the current version is latest
 
 Short forms:
-  ${APP_NAME} update                Update pi only
-  ${APP_NAME} update --all          Update pi and all extensions
+  ${APP_NAME} update                Update ${APP_NAME} only
+  ${APP_NAME} update --all          Update ${APP_NAME} and all extensions
   ${APP_NAME} update --models       Refresh model catalogs only
   ${APP_NAME} update <source>       Update one package
-  ${APP_NAME} update pi             Update pi only (self works as alias to pi)
+  ${APP_NAME} update ${APP_NAME}          Update ${APP_NAME} only (self works as an alias)
+
+${APP_NAME === "pi" ? "" : "Source installs: update this Stela checkout manually. Self-update is disabled; --extensions and --models remain available."}
 `);
 			return;
 
@@ -553,7 +556,7 @@ function parsePackageCommand(args: string[]): PackageCommandOptions | undefined 
 			}
 			updateTarget = { type: "extensions", source: extensionFlagSource };
 		} else if (source) {
-			const sourceIsSelf = source === "self" || source === "pi";
+			const sourceIsSelf = source === "self" || source === APP_NAME;
 			if (sourceIsSelf) {
 				updateTarget = extensionsFlag ? { type: "all" } : { type: "self" };
 			} else {
@@ -933,6 +936,19 @@ export async function handlePackageCommand(
 	if ((options.command === "install" || options.command === "remove") && !source) {
 		console.error(chalk.red(`Missing ${options.command} source.`));
 		console.error(chalk.dim(`Usage: ${getPackageCommandUsage(options.command)}`));
+		process.exitCode = 1;
+		return true;
+	}
+
+	if (
+		APP_NAME !== "pi" &&
+		options.command === "update" &&
+		options.updateTarget &&
+		updateTargetIncludesSelf(options.updateTarget)
+	) {
+		console.error(
+			"Stela self-update is disabled. Update the source checkout manually; use --extensions or --models for those updates.",
+		);
 		process.exitCode = 1;
 		return true;
 	}

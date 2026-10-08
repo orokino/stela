@@ -1,3 +1,5 @@
+This is the Stela fork. Follow the [Stela checkout installation and isolation instructions](../../README.md#run-stela-from-this-checkout), not the upstream installers below. Internal package names and inherited APIs remain unchanged; upstream installers install Pi, not this fork.
+
 <p align="center">
   <a href="https://pi.dev">
     <img alt="Pi logo" src="https://pi.dev/logo-auto.svg" width="128">

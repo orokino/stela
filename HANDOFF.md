@@ -20,13 +20,15 @@ No recovered proprietary code, prompts, strings, or assets have been added to th
 - Branch: `main`. `origin`: `git@github.com:orokino/stela.git`.
   `upstream`: `https://github.com/earendil-works/pi.git`. Upstream history, MIT license, and
   attribution are retained. Keep a small, ordered Stela patch stack.
-- Runtime source, package names, launcher, and persistence remain upstream Pi. There is no
-  Stela executable, isolated default state directory, theme implementation, or binary release yet.
-  Current setup changes are documentation and exclusions for private local research only.
+- The first runtime cutover provides a Node-based `stela` command and isolated default
+  `~/.stela/agent` state. Internal package names and persistence formats remain upstream.
+  No Stela theme or self-contained native binary release exists yet.
 - Entry points: `packages/coding-agent/` (CLI, tools, session integration, docs),
   `packages/agent/` (agent runtime), `packages/ai/` (providers/model data),
-  `packages/tui/` (terminal UI). `./pi-test.sh` launches this checkout from source;
-  a plain `pi` command launches the separate globally installed package.
+  `packages/tui/` (terminal UI). `./stela` launches the regular CLI from source.
+  `node scripts/install-stela.mjs` installs its checkout link at `~/.local/bin/stela`.
+  `./pi-test.sh` retains the experimental source entry; a plain `pi` command launches
+  the separate globally installed upstream package.
 
 ## Agreed direction
 
@@ -36,9 +38,12 @@ from the studied harnesses, rather than reproducing an entire upstream personali
 recorded; adjudicate conflicts once in writing.
 
 The fork is for ownership of the runtime and UI, not a startup-speed claim. Intended packaging is
-one native executable with its own `~/.stela/agent` state. Implement isolation before using the fork
-as Stela against personal state. Keep inherited persistence initially; defer a Stela SQLite migration,
-the desktop GUI, and the seven-target reverse-engineering sweep.
+one native executable with its own `~/.stela/agent` state. The Node-based command is the
+first step, not the native package. Keep inherited persistence initially; defer a Stela
+SQLite migration, the desktop GUI, and the seven-target reverse-engineering sweep.
+
+Subagent preference: **`gpt-6-luna`**. Select it when the orchestration interface supports a model
+override; otherwise disclose the limitation rather than silently substituting another model.
 
 ### Frozen visual tokens — shared by eventual TUI and GUI
 
@@ -77,11 +82,11 @@ printf '%s  %s\n' '439c53478c84ed27a58f8b54e1c3bd45810e5a969515b4e3666a3898d51ee
   '.artifacts/stela-bootstrap/models.all.json' | sha256sum -c -
 node packages/ai/scripts/hydrate-model-catalog.ts .artifacts/stela-bootstrap/models.all.json
 npm run check:model-data
-./pi-test.sh --version
-./pi-test.sh --help
+./stela --version
+./stela --help
 ```
 
-Observed: model-data check passed; source version printed `1.1.0`; help printed successfully.
+Original baseline verification, before the identity cutover: model-data check passed; source version printed `1.1.0`; help printed successfully.
 An offline RPC smoke with a temporary `PI_CODING_AGENT_DIR`, `--no-session`, disabled discovery,
 and no project approval passed `get_state` → real `bash` execution of `printf stela-fork-smoke` →
 updated context (`messageCount=1`) → orderly stdin-close shutdown. No model call or personal-state
@@ -89,9 +94,29 @@ migration was performed. Local smoke output: `.artifacts/stela-bootstrap/rpc-smo
 No standalone build, full test suite, or interactive TUI verification was performed in this setup session.
 
 Known upstream setup warnings: Gondolin's example dependency wants Node >=23.6.0; autoevals asks for
-pnpm. npm installation completed despite those engine warnings. The source launcher emits Node's
-experimental SQLite warning; the exercised source CLI/RPC paths still pass. Do not suppress or
-reinterpret that warning as a new Stela persistence implementation.
+pnpm. npm installation completed despite those engine warnings. Experimental source tooling emits
+Node's experimental SQLite warning; the regular `stela` source entry avoids loading that experimental
+server path at startup. Do not suppress or reinterpret the warning as a new Stela persistence implementation.
+
+## Stela CLI cutover — verified
+
+- Installed `~/.local/bin/stela` as a checkout link. The launcher preserves arguments, the caller's
+  working directory, exit codes, and termination signals. Reinstallation is idempotent; unrelated
+  executables and dangling symlinks are not overwritten. The existing global `pi` executable was unchanged.
+- Exercised the live TUI in tmux: Stela startup identity, a local faux-provider response, and shell execution.
+  Offline `fd` availability and tmux extended-key warnings remain visible; no theme redesign was performed.
+- Exercised the actual RPC CLI with a temporary home: default `~/.stela/agent` storage, credentials and
+  project settings not inherited from Pi, session naming and conversation persistence, resumed session
+  identity/content, persisted settings, Stela directory overrides, and `--session-dir` precedence.
+  Pi-state sentinel hashes were unchanged. All model turns used a local faux provider; no paid API calls.
+- Exercised upstream self-update rejection, including `--all`, before network/package changes.
+  Stela does not clean Pi managed-install staging. Extension/model updates remain inherited.
+- Refreshed command lockfile metadata without lifecycle scripts. Native packaging, prototype migration,
+  targeted reverse engineering, and visual-token application remain next-session work.
+- `npm run check` passed. The focused affected-test run passed 386 tests across 22 files; the 18
+  credential-gated RPC tests were skipped with Anthropic credentials unset. RPC behavior was instead
+  exercised through the actual CLI with the local faux provider. The full test suite was not run.
+  Source-only test bootstrap now includes durable-package aliases and the native plugin source resolver.
 
 ## Private Claude findings and proof-of-concept archive
 
@@ -126,9 +151,9 @@ Historical measurement takeaways, not benchmarks of this new source checkout:
 
 ## Next session — reverse engineering and building
 
-1. Start from this checkout and this handoff. Choose the first concrete Stela capability and inspect
-   the corresponding Pi runtime path. Implement Stela identity/launch/state isolation as the first
-   runtime cutover; keep normal Pi tooling and package names until a deliberate change requires more.
+1. Start from this checkout and this handoff. Stela identity/launch/state isolation is implemented;
+   see the root README for installation and discovery boundaries. Choose the first concrete
+   capability and inspect its inherited runtime path. Keep package names and persistence formats.
 2. Reverse engineer only the selected missing behavior, using private Claude findings where relevant
    and a pinned, licensed source target such as Codex or Opencode for comparison. Record evidence,
    uncertainty, redistribution status, and the chosen behavior; do not start a seven-target sweep.
@@ -138,6 +163,6 @@ Historical measurement takeaways, not benchmarks of this new source checkout:
 
 Suggested opening prompt:
 
-> Stela. Read HANDOFF.md. Continue from the clean Pi fork, not claudeish-pi. Begin the first
-> runtime cutover for Stela identity and isolated state, then reverse engineer and implement
-> selected capabilities from reviewed evidence. Keep the prototype and recovered material private.
+> Stela. Read HANDOFF.md. Continue from the isolated Stela CLI in the clean Pi fork,
+> not claudeish-pi. Select one concrete missing capability, review behavioral evidence,
+> and implement it cleanly. Keep the prototype and recovered material private.

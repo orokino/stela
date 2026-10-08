@@ -9,8 +9,52 @@ Recovered proprietary code, prompts, strings, and assets are not included in thi
 Future capabilities will be implemented from reviewed behavioral findings, with one behavior per
 capability and its source and rationale recorded.
 
-The runtime, package names, state directory, and build tooling remain upstream Pi for now.
-The Pi documentation below describes the current inherited implementation, not completed Stela work.
+## Run Stela from this checkout
+
+Requires Node.js 22.19 or newer, installed checkout dependencies, and hydrated model data.
+See [HANDOFF.md](HANDOFF.md#verified-checkout-setup) for bootstrap commands.
+
+```bash
+node scripts/install-stela.mjs
+stela
+```
+
+The installer links `~/.local/bin/stela` to this checkout. Keep the checkout in place
+and put `~/.local/bin` on `PATH`. It refuses to replace an unrelated existing command,
+does not edit shell configuration, and does not modify your existing `pi` installation.
+Use `node scripts/install-stela.mjs --bin-dir <directory>` for a different installation
+directory, or run `./stela` directly without installing. The installer supports Linux/macOS;
+on Windows, run `node stela` from the checkout.
+
+This is a Node-based CLI, **not a self-contained native executable**. Internal package names,
+upstream runtime formats, and build tooling are retained.
+
+### State and discovery boundary
+
+- Global settings, credentials, model catalogs, sessions, trust decisions, and resources:
+  `~/.stela/agent`.
+- Project configuration and resources: `.stela/`, with inherited project-trust rules.
+- Overrides: `STELA_CODING_AGENT_DIR`, `STELA_CODING_AGENT_SESSION_DIR`, and `STELA_PACKAGE_DIR`.
+  `--session-dir` takes precedence over the session environment override.
+- No automatic import or fallback to `~/.pi/agent`, project `.pi/`, or Pi's directory overrides.
+  Set up Stela credentials separately with `/login`; generic provider API-key environment variables
+  remain available.
+- Shared instruction-file and `.agents/skills` discovery remains enabled. Provider-owned credential
+  conventions (for example AWS profiles and Google ADC) remain shared. Explicitly configured package
+  sources may resolve an existing global npm installation; Stela does not import Pi's package settings.
+- CLI child processes receive `AI_AGENT=stela` and `STELA_CODING_AGENT=true`. Inherited shell-session
+  metadata still uses `PI_SESSION_*`, `PI_PROVIDER`, `PI_MODEL`, and `PI_REASONING_LEVEL`.
+- Experimental source tooling uses `~/.stela/server`, `STELA_SERVER_DIR`, and `STELA_SERVER_ID`.
+  The installed `stela` launcher uses the regular CLI, not the experimental command entry.
+
+Stela self-update is disabled: update this source checkout deliberately. `stela update --extensions`
+and `stela update --models` retain their inherited behavior. Other `PI_*` behavior controls
+(including `PI_OFFLINE` and `PI_TELEMETRY`), provider/catalog services, and upstream integrations
+remain inherited. State separation is **not a filesystem or process sandbox**.
+
+The Pi documentation below describes the inherited implementation. Substitute `stela` for the
+command and `.stela` for agent/project state paths unless using a separate upstream Pi installation.
+The configuration and environment references document the cutover.
 Upstream history, MIT licensing, and attribution are retained.
 
 ---

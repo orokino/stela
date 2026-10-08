@@ -1,3 +1,6 @@
+// Bundled plugins use native Node imports outside Vitest's source aliases.
+import "../src/experimental/source-resolver.ts";
+
 import { lstat, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,11 +10,12 @@ import { Client, ServerError as ClientServerError } from "@earendil-works/pi-cli
 import { createUnixTransportFactory } from "@earendil-works/pi-client/unix";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ExampleFacetService } from "../examples/plugins/pi-example-plugin/src/contract.ts";
+import { ENV_AGENT_DIR } from "../src/config.ts";
 import { runClient } from "../src/experimental/client.ts";
 import { activateBuiltinClientServices, openClientRuntime } from "../src/experimental/client-runtime.ts";
 import { createPresentationFacetLoaders } from "../src/experimental/plugins/bundled.ts";
 import * as processRuntime from "../src/experimental/process.ts";
-import { type RunningServer, startServer } from "../src/experimental/server.ts";
+import { ENV_SERVER_DIR, ENV_SERVER_ID, type RunningServer, startServer } from "../src/experimental/server.ts";
 import { AgentController } from "../src/experimental/services/agent-controller.ts";
 import { createSessionServiceSource, type SessionAttachmentState } from "../src/experimental/services/connection.ts";
 import { Models } from "../src/experimental/services/models.ts";
@@ -39,7 +43,7 @@ beforeEach(async () => {
 	agentDir = await mkdtemp(join("/tmp", "pi-experimental-agent-"));
 	directories.add(agentDir);
 	await configureExperimentalWorkerModel(agentDir);
-	vi.stubEnv("PI_CODING_AGENT_DIR", agentDir);
+	vi.stubEnv(ENV_AGENT_DIR, agentDir);
 	await createExperimentalSessions(join(agentDir, "experimental", "sessions"), ["demo-1", "demo-2"]);
 });
 
@@ -82,12 +86,12 @@ afterEach(async () => {
 });
 
 describe("experimental durable server composition", () => {
-	test("uses PI_SERVER_DIR and PI_SERVER_ID", async () => {
+	test("uses the configured server directory and identity", async () => {
 		const directory = await mkdtemp(join("/tmp", "pi-server-dir-"));
 		directories.add(directory);
 		const serverId = "00000000-0000-4000-8000-000000000001";
-		vi.stubEnv("PI_SERVER_DIR", directory);
-		vi.stubEnv("PI_SERVER_ID", serverId);
+		vi.stubEnv(ENV_SERVER_DIR, directory);
+		vi.stubEnv(ENV_SERVER_ID, serverId);
 		const runtime = await startServer();
 		servers.add(runtime);
 
@@ -168,8 +172,8 @@ describe("experimental durable server composition", () => {
 		const directory = await mkdtemp(join("/tmp", "pi-auto-server-"));
 		directories.add(directory);
 		const serverId = "00000000-0000-4000-8000-000000000001";
-		vi.stubEnv("PI_SERVER_DIR", directory);
-		vi.stubEnv("PI_SERVER_ID", serverId);
+		vi.stubEnv(ENV_SERVER_DIR, directory);
+		vi.stubEnv(ENV_SERVER_ID, serverId);
 
 		const results = await Promise.all([runClient({ command: "client" }), runClient({ command: "client" })]);
 		expect(results).toEqual([
@@ -198,8 +202,8 @@ describe("experimental durable server composition", () => {
 		directories.add(directory);
 		const serverId = "00000000-0000-4000-8000-000000000001";
 		const packagePath = fileURLToPath(new URL("../examples/plugins/pi-example-plugin", import.meta.url));
-		vi.stubEnv("PI_SERVER_DIR", directory);
-		vi.stubEnv("PI_SERVER_ID", serverId);
+		vi.stubEnv(ENV_SERVER_DIR, directory);
+		vi.stubEnv(ENV_SERVER_ID, serverId);
 
 		const first = await openClientRuntime({ command: "client", ...sessionWorkerModel });
 		try {
@@ -235,8 +239,8 @@ describe("experimental durable server composition", () => {
 		const directory = await mkdtemp(join("/tmp", "pi-auto-session-"));
 		directories.add(directory);
 		const serverId = "00000000-0000-4000-8000-000000000001";
-		vi.stubEnv("PI_SERVER_DIR", directory);
-		vi.stubEnv("PI_SERVER_ID", serverId);
+		vi.stubEnv(ENV_SERVER_DIR, directory);
+		vi.stubEnv(ENV_SERVER_ID, serverId);
 
 		await expect(runClient({ command: "client", sessionId: "demo-1", ...sessionWorkerModel })).resolves.toEqual({
 			kind: "attached",

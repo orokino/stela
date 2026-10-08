@@ -5,10 +5,16 @@
 ### Breaking Changes
 
 - Moved the published theme JSON Schema to `schemas/theme.schema.json` and made theme loading reject unknown top-level properties and unknown properties under `colors` or `export`. Update existing theme `$schema` references to the new path, define reusable custom colors under `vars`, and remove unsupported metadata.
+- Cut over this fork to the `stela` command, `~/.stela/agent` global state, `.stela` project configuration, and Stela-specific directory overrides. Pi state is not imported automatically; upstream package names and persistence formats are retained.
+
+### Added
+
+- Added a Node-based checkout launcher and non-overwriting per-user installer for `stela`; existing global `pi` installations remain separate.
 
 ### Changed
 
 - Changed the `showHardwareCursor` setting to use only the terminal cursor instead of also drawing Pi's reverse-video cursor
+- Disabled upstream self-update and Pi managed-install cleanup for Stela source installs to avoid replacing the fork or modifying Pi installations. Extension and model-catalog updates remain available.
 
 ### Fixed
 

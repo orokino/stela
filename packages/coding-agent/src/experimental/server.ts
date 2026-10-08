@@ -17,7 +17,7 @@ import {
 import { createUnixServer, getUnixSocketPath } from "@earendil-works/pi-server/unix";
 import lockfile from "proper-lockfile";
 import type { AuthInput } from "../cli/experimental/command-options.ts";
-import { getAgentDir } from "../config.ts";
+import { APP_NAME, CONFIG_DIR_NAME, getAgentDir } from "../config.ts";
 import { resolvePath } from "../utils/paths.ts";
 import { CoordinatorConnection, type CoordinatorStartupLease, ensureCoordinator } from "./coordinator.ts";
 import { createPresentationFacetData } from "./plugins/bundled.ts";
@@ -48,11 +48,11 @@ import {
 } from "./session-catalog.ts";
 import { SessionPluginSelectionConflictError, SessionWorkerManager } from "./session-worker-manager.ts";
 
-export const ENV_SERVER_DIR = "PI_SERVER_DIR";
-export const ENV_SERVER_ID = "PI_SERVER_ID";
+export const ENV_SERVER_DIR = `${APP_NAME.toUpperCase()}_SERVER_DIR`;
+export const ENV_SERVER_ID = `${APP_NAME.toUpperCase()}_SERVER_ID`;
 
 export function resolveServerDirectory(directory?: string): string {
-	return resolvePath(directory ?? process.env[ENV_SERVER_DIR] ?? join(homedir(), ".pi", "server"));
+	return resolvePath(directory ?? process.env[ENV_SERVER_DIR] ?? join(homedir(), CONFIG_DIR_NAME, "server"));
 }
 
 export async function ensurePrivateServerDirectory(directory: string): Promise<void> {
@@ -331,9 +331,9 @@ export interface RunningServer {
 }
 
 export interface StartServerOptions {
-	/** Server profile and socket directory. Defaults to PI_SERVER_DIR or ~/.pi/server. */
+	/** Server profile and socket directory. Defaults to the app's server directory override or ~/.stela/server. */
 	readonly directory?: string;
-	/** Logical service ID. Defaults to PI_SERVER_ID or the directory's default-server-id. */
+	/** Logical service ID. Defaults to the app's server ID override or the directory's default-server-id. */
 	readonly serverId?: ServerId;
 	/** Durable session directory. Defaults to the experimental directory under the configured agent directory. */
 	readonly sessionDir?: string;

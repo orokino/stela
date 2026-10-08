@@ -1,0 +1,33 @@
+#!/usr/bin/env node
+import { spawn } from "node:child_process";
+import { realpathSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const root = dirname(realpathSync(fileURLToPath(import.meta.url)));
+const resolver = pathToFileURL(join(root, "packages/coding-agent/src/experimental/source-resolver.ts")).href;
+const entry = join(root, "packages/coding-agent/src/cli.ts");
+const child = spawn(process.execPath, ["--import", resolver, entry, ...process.argv.slice(2)], {
+	stdio: "inherit",
+});
+
+const signals = process.platform === "win32" ? ["SIGINT", "SIGTERM"] : ["SIGINT", "SIGTERM", "SIGHUP"];
+const handlers = new Map();
+for (const signal of signals) {
+	const handler = () => child.kill(signal);
+	handlers.set(signal, handler);
+	process.on(signal, handler);
+}
+
+child.on("error", (error) => {
+	console.error(`stela: ${error.message}`);
+	process.exitCode = 1;
+});
+child.on("close", (code, signal) => {
+	for (const [name, handler] of handlers) process.removeListener(name, handler);
+	if (signal) {
+		process.kill(process.pid, signal);
+	} else {
+		process.exitCode = code ?? 1;
+	}
+});
