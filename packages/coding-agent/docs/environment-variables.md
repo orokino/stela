@@ -74,7 +74,7 @@ When disabled, Stela removes inherited values for these variables so nested agen
 
 ## Stela Process Configuration
 
-These variables are read by Stela itself. The remaining `PI_*` names are inherited behavior controls, not Stela state-directory fallbacks:
+These variables are read by Stela itself. The remaining `PI_*` names are inherited behavior controls, not fallbacks to upstream Pi's state directories:
 
 | Variable | Description |
 |----------|-------------|
@@ -98,7 +98,8 @@ These variables are read by Stela itself. The remaining `PI_*` names are inherit
 
 Provider credentials such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and provider-specific configuration are listed in [Providers](providers.md#use-an-api-key-from-the-environment).
 
-Only the Stela-specific directory overrides in the table above select Stela paths. Experimental source commands use `STELA_SERVER_DIR`
-(default `~/.stela/server`) and `STELA_SERVER_ID`; the corresponding upstream Pi overrides are not read.
+Upstream Pi's `PI_CODING_AGENT_DIR`, `PI_CODING_AGENT_SESSION_DIR`, and `PI_PACKAGE_DIR` do not
+select Stela state or package assets. Experimental source commands use `STELA_SERVER_DIR`
+(default `~/.stela/server`) and `STELA_SERVER_ID`, not the corresponding Pi overrides.
 Self-update and Pi managed-install cleanup are disabled for Stela; model-catalog and extension
 updates remain available.

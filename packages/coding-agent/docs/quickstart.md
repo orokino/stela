@@ -6,27 +6,13 @@ For native Windows setup, read [Windows Setup](windows.md). For Android, read [T
 
 ## 1. Install Stela
 
-On macOS or Linux, you can use the installer:
+Stela runs from a source checkout; there is no npm package, release installer, or Nix flake for it. Prepare the checkout as described in the repository README (Node.js 22.19 or newer, installed dependencies, hydrated model data), then link the `stela` command:
 
 ```bash
-curl -fsSL https://pi.dev/install.sh | sh
+node scripts/install-stela.mjs
 ```
 
-The installer pins all dependencies and updates Stela with `stela update`. Alternatively, install Stela from npm, which does not pin transitive dependencies. This requires Node.js 22.19 or newer:
-
-```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent
-```
-
-Stela does not require dependency lifecycle scripts for a normal npm installation.
-
-With Nix on macOS or Linux, install the latest release from Stela's flake. Nix builds Stela from source:
-
-```bash
-nix profile add github:earendil-works/pi/stable
-```
-
-Older Nix versions use `nix profile install` instead. Update with `nix profile upgrade pi`; `stela update` cannot update a Nix installation. To pin a release, use a tag such as `github:earendil-works/pi/v1.0.0`.
+The installer links `~/.local/bin/stela` to the checkout, so keep the checkout in place and put `~/.local/bin` on `PATH`. Use `--bin-dir <directory>` for another location, or run `./stela` from the checkout without installing. It does not modify an existing upstream `pi` installation.
 
 Verify the installation:
 
@@ -117,22 +103,6 @@ Start with the least powerful mechanism that meets your need:
 
 ## Uninstall Stela
 
-If you installed Stela with npm, run:
+Remove the `stela` link the installer created (`~/.local/bin/stela`, or the `--bin-dir` you chose), then delete the checkout if you no longer need it.
 
-```bash
-npm uninstall -g @earendil-works/pi-coding-agent
-```
-
-If you used the installer, run it again and choose **Uninstall Stela**:
-
-```bash
-curl -fsSL https://pi.dev/install.sh | sh
-```
-
-If you installed Stela with Nix, run:
-
-```bash
-nix profile remove pi
-```
-
-None of these methods removes configuration, credentials, sessions, or installed Stela packages from `~/.stela/agent/`.
+This does not remove configuration, credentials, sessions, or installed Stela packages from `~/.stela/agent/`.
