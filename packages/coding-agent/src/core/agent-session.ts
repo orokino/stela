@@ -532,9 +532,10 @@ export class AgentSession {
 			includeAllExtensionTools: true,
 		});
 		if (this._initialActiveToolNames === undefined) this._restoreToolsFromTranscript();
-		// The loadout declares exit_plan_mode only in plan mode (see `_applyToolLoadout`).
-		this._unsubscribePermissionMode = this.permissions?.onModeChange(() => {
+		this._unsubscribePermissionMode = this.permissions?.onModeChange((mode, previousMode) => {
+			// The loadout declares exit_plan_mode only in plan mode (see `_applyToolLoadout`).
 			this._setActiveTools(this.getActiveToolNames());
+			void this._extensionRunner.emit({ type: "permission_mode_change", mode, previousMode });
 		});
 	}
 
@@ -3519,6 +3520,10 @@ export class AgentSession {
 				getSystemPromptOptions: () => this._baseSystemPromptOptions,
 				executeTool: (callerId, name, args, options) => this._executeNestedToolCall(callerId, name, args, options),
 				getCallableTools: () => this._getCallableTools(),
+				getPermissions: () => {
+					const permissions = this.permissions;
+					return permissions && { getMode: () => permissions.mode, setMode: (mode) => permissions.setMode(mode) };
+				},
 			},
 			{
 				registerProvider: (name, config) => {

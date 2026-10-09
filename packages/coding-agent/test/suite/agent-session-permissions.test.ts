@@ -338,4 +338,88 @@ describe("permission gate in AgentSession", () => {
 			}
 		});
 	});
+
+	describe("extension API", () => {
+		function writeTool(executed: string[]): AgentTool {
+			return {
+				name: "write",
+				label: "write",
+				description: "Write a file",
+				parameters: Type.Object({ path: Type.String(), content: Type.String() }),
+				execute: async (_id, params) => {
+					executed.push((params as { path: string }).path);
+					return { content: [{ type: "text", text: "written" }], details: {} };
+				},
+			};
+		}
+
+		it("extensions read and set the mode and see every mode change", async () => {
+			const executed: string[] = [];
+			const changes: string[] = [];
+			const seenModes: Array<string | undefined> = [];
+			const harness = await createHarness({
+				tools: [writeTool(executed)],
+				permissions: { analyzeShell: simpleShell },
+				extensionFactories: [
+					(pi) => {
+						pi.on("permission_mode_change", async (event) => {
+							changes.push(`${event.previousMode}->${event.mode}`);
+						});
+						// Runs before the gate, so the gate already decides in the new mode.
+						pi.on("tool_call", async (_event, ctx) => {
+							seenModes.push(ctx.permissions?.getMode());
+							ctx.permissions?.setMode("acceptEdits");
+							return undefined;
+						});
+					},
+				],
+			});
+			harnesses.push(harness);
+			respond(harness, ["write", { path: "a.txt", content: "x" }]);
+			await harness.session.prompt("go");
+			harness.session.permissions?.setMode("plan");
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(seenModes).toEqual(["manual"]);
+			expect(executed).toEqual(["a.txt"]);
+			expect(changes).toEqual(["manual->acceptEdits", "acceptEdits->plan"]);
+		});
+
+		it("setMode refuses an unavailable mode", async () => {
+			let error: unknown;
+			const harness = await createHarness({
+				permissions: { analyzeShell: simpleShell },
+				extensionFactories: [
+					(pi) => {
+						pi.on("session_start", async (_event, ctx) => {
+							try {
+								ctx.permissions?.setMode("bypassPermissions");
+							} catch (caught) {
+								error = caught;
+							}
+						});
+					},
+				],
+			});
+			harnesses.push(harness);
+			await harness.session.bindExtensions({});
+			expect(String(error)).toContain("--allow-bypass-permissions");
+			expect(harness.session.permissions?.mode).toBe("manual");
+		});
+
+		it("is undefined without a permission gate", async () => {
+			let permissions: unknown = "unset";
+			const harness = await createHarness({
+				extensionFactories: [
+					(pi) => {
+						pi.on("session_start", async (_event, ctx) => {
+							permissions = ctx.permissions;
+						});
+					},
+				],
+			});
+			harnesses.push(harness);
+			await harness.session.bindExtensions({});
+			expect(permissions).toBeUndefined();
+		});
+	});
 });

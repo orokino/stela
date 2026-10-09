@@ -86,6 +86,7 @@ export type {
 	ExtensionFlag,
 	ExtensionHandler,
 	ExtensionMode,
+	ExtensionPermissions,
 	// Runtime
 	ExtensionRuntime,
 	ExtensionShortcut,
@@ -124,6 +125,7 @@ export type {
 	ModelSelectEvent,
 	ModelSelectSource,
 	NormalizedBuildSystemPromptOptions,
+	PermissionModeChangeEvent,
 	PowerShellToolCallEvent,
 	PowerShellToolResultEvent,
 	ProjectTrustContext,

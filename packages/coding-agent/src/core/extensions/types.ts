@@ -67,6 +67,7 @@ import type { McpServerConfig, McpServerRegistry, RegisteredMcpServer } from "..
 import type { CustomMessage } from "../messages.ts";
 import type { ModelRegistry } from "../model-registry.ts";
 import type { ScopedModel } from "../model-resolver.ts";
+import type { PermissionMode } from "../permissions/modes.ts";
 import type {
 	BranchSummaryEntry,
 	CompactionEntry,
@@ -362,6 +363,19 @@ export interface ExtensionContext {
 	compact(options?: CompactOptions): void;
 	/** Get the current effective system prompt. */
 	getSystemPrompt(): string;
+	/** The session's permission mode, or undefined when the session runs tool calls without a permission gate. */
+	permissions: ExtensionPermissions | undefined;
+}
+
+/**
+ * The permission mode, as extensions see it. Extensions cannot change rules or grants: a `tool_call` handler can
+ * still block or rewrite a call, and the gate then checks the final arguments, so an extension cannot turn a
+ * deny into an allow.
+ */
+export interface ExtensionPermissions {
+	getMode(): PermissionMode;
+	/** Switch the mode. Throws when the mode is unavailable, e.g. bypass without `--allow-bypass-permissions`. */
+	setMode(mode: PermissionMode): void;
 }
 
 /** Options for {@link ExtensionToolContext.executeTool}. */
@@ -1117,6 +1131,13 @@ export interface ThinkingLevelSelectEvent {
 	previousLevel: ThinkingLevel;
 }
 
+/** Fired when the permission mode changes, from the user, `exit_plan_mode`, or an extension. */
+export interface PermissionModeChangeEvent {
+	type: "permission_mode_change";
+	mode: PermissionMode;
+	previousMode: PermissionMode;
+}
+
 // ============================================================================
 // User Bash Events
 // ============================================================================
@@ -1403,6 +1424,7 @@ export type ExtensionEvent =
 	| ToolExecutionEndEvent
 	| ModelSelectEvent
 	| ThinkingLevelSelectEvent
+	| PermissionModeChangeEvent
 	| UserBashEvent
 	| InputEvent
 	| ToolCallEvent
@@ -1630,6 +1652,7 @@ export interface ExtensionAPI {
 	on(event: "tool_execution_end", handler: ExtensionHandler<ToolExecutionEndEvent>): () => void;
 	on(event: "model_select", handler: ExtensionHandler<ModelSelectEvent>): () => void;
 	on(event: "thinking_level_select", handler: ExtensionHandler<ThinkingLevelSelectEvent>): () => void;
+	on(event: "permission_mode_change", handler: ExtensionHandler<PermissionModeChangeEvent>): () => void;
 	on(event: "tool_call", handler: ExtensionHandler<ToolCallEvent, ToolCallEventResult>): () => void;
 	on(event: "tool_result", handler: ExtensionHandler<ToolResultEvent, ToolResultEventResult>): () => void;
 	on(event: "user_bash", handler: ExtensionHandler<UserBashEvent, UserBashEventResult>): () => void;
@@ -2199,6 +2222,8 @@ export interface ExtensionContextActions {
 	) => Promise<AgentToolCallOutcome>;
 	/** Backs `ExtensionToolContext.tools`. */
 	getCallableTools?: () => readonly AgentTool[];
+	/** Backs `ExtensionContext.permissions`. */
+	getPermissions?: () => ExtensionPermissions | undefined;
 }
 
 /**
