@@ -13,6 +13,7 @@ import { createToolNameMatcher } from "./mcp-servers.ts";
 import { convertToLlm } from "./messages.ts";
 import { findInitialModel } from "./model-resolver.ts";
 import { ModelRuntime } from "./model-runtime.ts";
+import { createModelPermissionClassifier } from "./permissions/auto-decider.ts";
 import { PermissionController, type PermissionControllerOptions } from "./permissions/permission-controller.ts";
 import { mergeProviderAttributionHeaders } from "./provider-attribution.ts";
 import type { ResourceLoader } from "./resource-loader.ts";
@@ -491,6 +492,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 					agentDir,
 					settingsManager,
 					planFilePath: join(agentDir, "plans", `${sessionManager.getSessionId()}.md`),
+					classifier: createModelPermissionClassifier(modelRuntime),
 				})
 			: undefined,
 	});

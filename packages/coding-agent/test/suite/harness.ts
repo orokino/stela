@@ -20,6 +20,7 @@ import { AgentSession, type AgentSessionEvent } from "../../src/core/agent-sessi
 import { AuthStorage } from "../../src/core/auth-storage.ts";
 import type { ExtensionRunner, ExtensionUIContext } from "../../src/core/extensions/index.ts";
 import { convertToLlm } from "../../src/core/messages.ts";
+import { createModelPermissionClassifier } from "../../src/core/permissions/auto-decider.ts";
 import {
 	PermissionController,
 	type PermissionControllerOptions,
@@ -249,6 +250,8 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
 		extensionRunnerRef,
 		permissionController: options.permissions
 			? new PermissionController({
+					// Like the SDK; tests may pass their own classifier.
+					classifier: createModelPermissionClassifier(getModelRuntime(modelRegistry)),
 					...options.permissions,
 					cwd: tempDir,
 					agentDir: join(tempDir, "agent"),

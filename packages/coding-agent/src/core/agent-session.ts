@@ -699,11 +699,26 @@ export class AgentSession {
 
 		if (!this.permissions) return undefined;
 		const prompter = runner.hasUI() ? createUIPermissionPrompter(runner.getUIContext()) : undefined;
-		const check = await this.permissions.check(toolCall.name, args, prompter, signal);
+		const check = await this.permissions.check(toolCall.name, args, {
+			prompter,
+			signal,
+			getUserIntent: () => this._lastUserMessageText(),
+		});
 		if (!check.block) return undefined;
 		// The user said no without a reason: give control back.
 		if (check.abortTurn) this._abortRunFromToolCall();
 		return { block: true, reason: check.reason };
+	}
+
+	private _lastUserMessageText(): string | undefined {
+		const messages = this.agent.state.messages;
+		for (let i = messages.length - 1; i >= 0; i--) {
+			const message = messages[i];
+			if (message.role !== "user") continue;
+			if (typeof message.content === "string") return message.content;
+			return message.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("\n");
+		}
+		return undefined;
 	}
 
 	/** Stop the run from inside a tool call. `abort()` would wait for idle from inside the run, so only signal it. */

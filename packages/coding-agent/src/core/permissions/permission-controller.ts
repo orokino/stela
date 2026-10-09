@@ -2,6 +2,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CONFIG_DIR_NAME } from "../../config.ts";
 import type { SettingsManager } from "../settings-manager.ts";
+import {
+	AutoDecider,
+	clampClassifierTimeout,
+	type PermissionClassifier,
+	projectClassifierArgs,
+	shorten,
+} from "./auto-decider.ts";
 import { loadShellAnalyzer } from "./bash-analyzer.ts";
 import { decidePermission, type PermissionDecision, type ShellAnalyzer } from "./gate.ts";
 import {
@@ -67,6 +74,16 @@ export interface PermissionControllerOptions {
 	analyzeShell?: ShellAnalyzer;
 	/** The one file plan mode may write: a draft of the plan. */
 	planFilePath?: string;
+	/** Auto mode's classifier. Without it, auto mode asks wherever the classifier would decide. */
+	classifier?: PermissionClassifier;
+}
+
+export interface PermissionCheckOptions {
+	/** Asks the user. Without it (print and json modes) a call that needs approval is denied. */
+	prompter?: PermissionPrompter;
+	signal?: AbortSignal;
+	/** The user's last message, for the auto mode classifier. */
+	getUserIntent?: () => string | undefined;
 }
 
 export type PermissionModeListener = (mode: PermissionMode, previous: PermissionMode) => void;
@@ -87,6 +104,7 @@ export class PermissionController {
 	private readonly sessionRules: PermissionRule[] = [];
 	private readonly listeners = new Set<PermissionModeListener>();
 	private analyzer: Promise<ShellAnalyzer>;
+	private readonly autoDecider: AutoDecider | undefined;
 	private currentMode: PermissionMode;
 	/** Set when the requested starting mode was unavailable and manual was used instead. */
 	readonly startupWarning: string | undefined;
@@ -98,6 +116,7 @@ export class PermissionController {
 		this.cliAllowBypass = options.allowBypass ?? false;
 		this.cliDirectories = options.additionalDirectories ?? [];
 		this.planFilePath = options.planFilePath;
+		this.autoDecider = options.classifier ? new AutoDecider(options.classifier) : undefined;
 		this.analyzer = options.analyzeShell ? Promise.resolve(options.analyzeShell) : loadShellAnalyzer();
 		const configured = parsePermissionMode(this.settingsManager.getSettings().permissions?.defaultMode ?? "");
 		const initial = options.initialMode ?? configured ?? DEFAULT_PERMISSION_MODE;
@@ -175,18 +194,34 @@ export class PermissionController {
 	}
 
 	/**
-	 * Decide a call and, when it asks, prompt through `prompter`. Without a prompter (print and json modes) a
-	 * call that needs approval is denied with a reason, and the turn continues so the model can report it.
+	 * Decide a call; in auto mode the classifier decides what the rules leave open. When the call still asks,
+	 * prompt through `prompter`. Without a prompter (print and json modes) a call that needs approval is denied
+	 * with a reason, and the turn continues so the model can report it.
 	 */
-	async check(
-		toolName: string,
-		args: unknown,
-		prompter: PermissionPrompter | undefined,
-		signal?: AbortSignal,
-	): Promise<PermissionCheckResult> {
+	async check(toolName: string, args: unknown, options: PermissionCheckOptions = {}): Promise<PermissionCheckResult> {
+		const { prompter, signal } = options;
 		const decision = await this.decide(toolName, args);
 		if (decision.action === "allow") return { block: false };
 		if (decision.action === "deny") return { block: true, reason: decision.reason };
+
+		const settings = this.settingsManager.getSettings().permissions ?? {};
+		if (decision.classifiable && this.currentMode === "auto" && this.autoDecider && settings.auto?.model) {
+			const userIntent = options.getUserIntent?.();
+			const auto = await this.autoDecider.decide(
+				{
+					toolName,
+					args: projectClassifierArgs(args),
+					cwd: this.cwd,
+					userIntent: userIntent === undefined ? undefined : shorten(userIntent),
+					reason: decision.reason,
+				},
+				{ model: settings.auto.model, timeoutMs: clampClassifierTimeout(settings.auto.timeoutMs), signal },
+			);
+			if (auto.action === "allow") return { block: false };
+			if (auto.action === "deny") return { block: true, reason: auto.reason };
+			decision.reason = auto.reason;
+		}
+
 		if (!prompter) {
 			return {
 				block: true,
