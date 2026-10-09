@@ -40,6 +40,10 @@
               "path": "security.md"
             },
             {
+              "title": "Control Tool Permissions",
+              "path": "permissions.md"
+            },
+            {
               "title": "Isolate Pi",
               "path": "containerization.md"
             },
