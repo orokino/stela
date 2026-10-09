@@ -35,7 +35,7 @@ Install Termux from [GitHub or F-Droid](https://github.com/termux/termux-app#ins
    cd "$HOME/stela"
    ```
 
-   Keep this checkout in place; the installed command links to it. The bootstrap below follows the [verified checkout setup](../../../HANDOFF.md#verified-checkout-setup), though Termux-specific compatibility has not been verified.
+   Keep this checkout in place; the installed command links to it. The bootstrap below follows the [checkout setup](../../../README.md#run-stela-from-this-checkout), though Termux-specific compatibility has not been verified.
 
 4. Install checkout dependencies and hydrate model data:
 
