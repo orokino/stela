@@ -133,4 +133,4 @@ If you installed Pi with Nix, run:
 nix profile remove pi
 ```
 
-None of these methods removes configuration, credentials, sessions, or installed Pi packages from `~/.pi/agent/`.
+None of these methods removes configuration, credentials, sessions, or installed Pi packages from `~/.stela/agent/`.

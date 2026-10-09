@@ -76,7 +76,7 @@ The Termux clipboard API supports text only. Pi's clipboard-paste shortcut inser
 
 ## Add Termux-specific instructions
 
-Pi detects that it is running in Termux, but it cannot infer how you want it to interact with Android. Add only the environment details relevant to your work to `~/.pi/agent/AGENTS.md`:
+Pi detects that it is running in Termux, but it cannot infer how you want it to interact with Android. Add only the environment details relevant to your work to `~/.stela/agent/AGENTS.md`:
 
 ````markdown
 # Termux environment

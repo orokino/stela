@@ -53,6 +53,12 @@ describe("pi mcp", () => {
 		expect(ok.exitCode).toBe(0);
 	});
 
+	it("points to the Stela config files when no server is configured", async () => {
+		const { exitCode, output, agentDir } = await run(["list"], undefined);
+		expect(exitCode).toBe(0);
+		expect(output).toBe(`No MCP servers configured. Add them to ${join(agentDir, "mcp.json")} or .stela/mcp.json.`);
+	});
+
 	it("prints JSON for scripts", async () => {
 		const { exitCode, output } = await run(["list", "--json"], { fixture: servers.fixture, parked: servers.parked });
 		expect(exitCode).toBe(0);

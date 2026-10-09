@@ -14,7 +14,7 @@ Typical extensions add an agent tool, protect paths, confirm dangerous commands,
 
 An extension exports a default factory that receives `ExtensionAPI`. The factory registers capabilities for the current extension runtime.
 
-Create `~/.pi/agent/extensions/hello.ts`:
+Create `~/.stela/agent/extensions/hello.ts`:
 
 ```typescript
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";

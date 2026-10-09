@@ -26,6 +26,7 @@
 
 ### Fixed
 
+- Fixed the MCP "No MCP servers configured" message and the docs pointing to `.pi/` and `~/.pi/agent` instead of `.stela/` and `~/.stela/agent`.
 - Fixed Mistral streams being aborted mid-generation (e.g. during long thinking) after the request timeout; the timeout now applies only to waiting for response headers ([#10609](https://github.com/earendil-works/pi/issues/10609))
 
 ## [1.1.0] - 2026-10-07
