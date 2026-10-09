@@ -205,7 +205,20 @@ The approved plan, with phase details, decision ledger and implementation outlin
   `build:binary` (which would otherwise regenerate models over the network). A copy of `dist/pi` with its assets
   outside the repo parses `ls && cat a.txt | wc -l` (allowed) and flags `git push --force`; without
   `tree-sitter-bash.wasm` it fails closed with "shell parser unavailable". Permission modes work is complete.
-  Still open from 5.5: "Pi"/`pi` in doc prose and command examples, and `examples/` READMEs with `~/.pi` paths.
+
+**Docs rename (2026-10-09), done and pushed.** Two gpt-6-luna workers (effort max) through Orca run
+`run_60b7ec66159d`; both settled, released, nothing reclaimable.
+- `284ce3a23` (worker): "Pi" -> "Stela", `pi` -> `stela`, `~/.pi` -> `~/.stela` across 47 coding-agent docs and
+  example READMEs. Kept: package names, the `pi.` extension API, hardcoded `PI_*` variables, upstream URLs.
+- `d0f8f6734` (review fixes): the worker had dropped or inverted the notes that upstream Pi's
+  `PI_CODING_AGENT_DIR`/`PI_CODING_AGENT_SESSION_DIR`/`PI_PACKAGE_DIR` do not select Stela state; and
+  `quickstart.md` said "Install Stela" over upstream Pi's installer, npm package and Nix flake. It now documents
+  `node scripts/install-stela.mjs` and its uninstall.
+- `d6e4a3959` (worker) and `6e7e49351`: `containerization.md` (`Dockerfile.stela`, clones
+  `https://github.com/orokino/stela.git`, which is public) and `termux.md` use the checkout bootstrap copied
+  verbatim from "Verified checkout setup" above. **Not executed:** the Docker build and the Termux steps.
+- Lesson: review rename diffs for meaning, not just strings; a blanket "Pi" -> "Stela" inverts sentences that
+  contrast Stela with upstream Pi, and leaves install commands that still fetch Pi.
 
 **Operational lessons (see also Claude memory `rea-reliability`):**
 - **Load:**
@@ -229,11 +242,19 @@ The approved plan, with phase details, decision ledger and implementation outlin
    the actual CLI/TUI path. Apply the frozen visual tokens when UI work begins. No automatic prototype
    port, recovered prompt import, extension inlining, GUI launch, or SQLite migration.
 
-Suggested opening prompt (permission modes, follow-ups):
+Candidate next steps (pick one; none started):
+1. **Test-suite cutover cleanup:** make `./test.sh` green apart from network-only tests. Known failures: tests
+   still expecting pi names (e.g. `test/program-status-reporter.test.ts` expects app `pi`), unbuilt-artifact
+   tests (pi-ai entry, chord, env daemon), offline `fd` tests, a flaky `auth-storage` test, 4 pi-ai
+   model-metadata tests. Small and makes later regressions visible.
+2. **Next capability** per steps 1-3 above. Candidates the README names as missing from upstream: sub-agents
+   (Stela-native, not Orca), and a Stela theme applying the frozen visual tokens.
+3. **Execute the new install docs:** a Docker build of `Dockerfile.stela` (heavy; ask first) and, if a device
+   is available, the Termux steps.
 
-> Stela. Read HANDOFF.md "Current work — permission modes" and item 5 of "Remaining" in
-> docs/research/permissions/PLAN.md. Permission modes steps 1–7 are committed and pushed. First ask me
-> the plan-mode protected-read decision (5.1). Then do 5.2–5.6 in order, each with tests and
-> npm run check, committed separately; verify UI changes live with the smoke tools in
-> docs/research/permissions/smoke/. Ask me before any build or before installing Bun (5.7).
-> Do not overload the machine.
+Suggested opening prompt (test cleanup):
+
+> Stela. Read HANDOFF.md "Current work — permission modes" and "Next session". Run ./test.sh once
+> (no full vitest), classify each failure as cutover leftover, unbuilt artifact, network, or flaky, and
+> ask me before changing any test that encodes upstream behavior. Fix the cutover leftovers with
+> npm run check clean, one commit per group. Do not overload the machine.
