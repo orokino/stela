@@ -118,6 +118,7 @@ import { type BashExecutionMessage, type CustomMessage, convertToLlm } from "./m
 import { ModelRegistry } from "./model-registry.ts";
 import type { ModelRuntime } from "./model-runtime.ts";
 import { NestedToolCallRunner } from "./nested-tool-calls.ts";
+import { createExitPlanModeToolDefinition, EXIT_PLAN_MODE_TOOL_NAME } from "./permissions/exit-plan-mode.ts";
 import type { PermissionController } from "./permissions/permission-controller.ts";
 import { createUIPermissionPrompter } from "./permissions/permission-prompt.ts";
 import { expandPromptTemplate, type PromptTemplate } from "./prompt-templates.ts";
@@ -390,6 +391,7 @@ export class AgentSession {
 
 	// Event subscription state
 	private _unsubscribeAgent?: () => void;
+	private _unsubscribePermissionMode?: () => void;
 	private _eventListeners: AgentSessionEventListener[] = [];
 	private _isAgentRunActive = false;
 	private _agentRunAbortRequested = false;
@@ -530,6 +532,10 @@ export class AgentSession {
 			includeAllExtensionTools: true,
 		});
 		if (this._initialActiveToolNames === undefined) this._restoreToolsFromTranscript();
+		// The loadout declares exit_plan_mode only in plan mode (see `_applyToolLoadout`).
+		this._unsubscribePermissionMode = this.permissions?.onModeChange(() => {
+			this._setActiveTools(this.getActiveToolNames());
+		});
 	}
 
 	get modelRuntime(): ModelRuntime {
@@ -695,13 +701,15 @@ export class AgentSession {
 		const prompter = runner.hasUI() ? createUIPermissionPrompter(runner.getUIContext()) : undefined;
 		const check = await this.permissions.check(toolCall.name, args, prompter, signal);
 		if (!check.block) return undefined;
-		if (check.abortTurn) {
-			// The user said no without a reason: stop the run and give control back. `abort()` would wait for
-			// idle from inside the run, so only signal it here.
-			if (this._isAgentRunActive) this._agentRunAbortRequested = true;
-			this.agent.abort();
-		}
+		// The user said no without a reason: give control back.
+		if (check.abortTurn) this._abortRunFromToolCall();
 		return { block: true, reason: check.reason };
+	}
+
+	/** Stop the run from inside a tool call. `abort()` would wait for idle from inside the run, so only signal it. */
+	private _abortRunFromToolCall(): void {
+		if (this._isAgentRunActive) this._agentRunAbortRequested = true;
+		this.agent.abort();
 	}
 
 	/** `tool_result` handlers and image normalization. `parentToolCallId` is set for calls another tool made. */
@@ -1404,6 +1412,8 @@ export class AgentSession {
 
 	/** Disconnect from agent events during disposal. */
 	private _disconnectFromAgent(): void {
+		this._unsubscribePermissionMode?.();
+		this._unsubscribePermissionMode = undefined;
 		if (this._unsubscribeAgent) {
 			this._unsubscribeAgent();
 			this._unsubscribeAgent = undefined;
@@ -1597,7 +1607,11 @@ export class AgentSession {
 	 * requests (see {@link _installHiddenDeclarationsProjection}).
 	 */
 	private _applyToolLoadout(toolNames: string[]): AgentTool[] {
-		const tools = [...new Set(toolNames)].flatMap((name) => {
+		// exit_plan_mode is declared exactly while plan mode is active.
+		const names = new Set(toolNames);
+		if (this.permissions?.mode === "plan") names.add(EXIT_PLAN_MODE_TOOL_NAME);
+		else names.delete(EXIT_PLAN_MODE_TOOL_NAME);
+		const tools = [...names].flatMap((name) => {
 			const tool = this._toolRegistry.get(name);
 			return tool && this._getToolExposure(name) !== "hidden" && this._isActivatable(name) ? [tool] : [];
 		});
@@ -3650,6 +3664,13 @@ export class AgentSession {
 		this._baseToolDefinitions = new Map(
 			Object.entries(baseToolDefinitions).map(([name, tool]) => [name, tool as ToolDefinition]),
 		);
+		if (this.permissions) {
+			const exitPlanMode = createExitPlanModeToolDefinition({
+				permissions: this.permissions,
+				abortTurn: () => this._abortRunFromToolCall(),
+			});
+			this._baseToolDefinitions.set(exitPlanMode.name, exitPlanMode as ToolDefinition);
+		}
 
 		const extensionsResult = this._resourceLoader.getExtensions();
 		if (options.flagValues) {

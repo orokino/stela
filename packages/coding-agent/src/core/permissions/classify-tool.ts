@@ -17,12 +17,15 @@ export type ClassifiedCall =
 	| { kind: "other"; tool: string };
 
 const READ_ONLY_TOOLS = new Set(["read", "grep", "find", "ls"]);
+/** Tools with their own user dialog; the gate does not ask again. */
+const SELF_APPROVING_TOOLS = new Set(["exit_plan_mode"]);
 const EDIT_TOOLS = new Set(["edit", "write"]);
 const SHELL_TOOLS = new Set(["bash", "powershell"]);
 const FETCH_TOOL = /^web_?fetch$/i;
 
 export function classifyToolCall(tool: string, args: unknown, cwd: string): ClassifiedCall {
 	const input = typeof args === "object" && args !== null ? (args as Record<string, unknown>) : {};
+	if (SELF_APPROVING_TOOLS.has(tool)) return { kind: "readOnly", tool, paths: [] };
 	if (READ_ONLY_TOOLS.has(tool)) {
 		const path = typeof input.path === "string" && input.path !== "" ? input.path : ".";
 		return { kind: "readOnly", tool, paths: [resolvePermissionPath(path, cwd)] };

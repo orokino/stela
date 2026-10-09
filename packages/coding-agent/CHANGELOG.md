@@ -13,6 +13,7 @@
 
 - Added permission modes for tool calls: manual (default), accept edits, plan, auto, and bypass permissions. Rules `Tool` or `Tool(specifier)` in `permissions.allow`/`ask`/`deny` apply in every mode (deny > ask > allow); project rules apply only in trusted projects. Bash commands are parsed so each segment, substitution, and redirect is checked. Calls that need approval open a dialog (once, this session, always in this project, or no with optional feedback); print and json modes deny them with a reason.
 - Added `--permission-mode`, `--allow-bypass-permissions`, and `--add-dir`, the `/permissions` picker, `/plan`, and the permission mode at the start of the footer.
+- Added the `exit_plan_mode` tool, declared only in plan mode: the model submits its plan and the user implements it in accept edits, manual, or auto, or keeps planning with feedback. Plan mode may write a plan draft to `~/.stela/agent/plans/<session-id>.md`.
 - Added a Node-based checkout launcher and non-overwriting per-user installer for `stela`; existing global `pi` installations remain separate.
 
 ### Changed

@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
@@ -224,5 +225,117 @@ describe("permission gate in AgentSession", () => {
 		await harness.session.prompt("go");
 		expect(executed).toEqual(["rm -rf build"]);
 		expect(existsSync(join(harness.tempDir, ".stela"))).toBe(false);
+	});
+
+	describe("exit_plan_mode", () => {
+		function bindPlanUi(harness: Harness, answers: string[], input?: string) {
+			const dialogs: Array<{ title: string; options: string[] }> = [];
+			return harness.session
+				.bindExtensions({
+					uiContext: createTestUiContext({
+						select: async (title, options) => {
+							dialogs.push({ title, options });
+							return answers.shift();
+						},
+						input: async () => input,
+					}),
+				})
+				.then(() => dialogs);
+		}
+
+		it("is declared only while plan mode is active", async () => {
+			const { harness } = await setup();
+			const permissions = harness.session.permissions;
+			expect(harness.session.getActiveToolNames()).not.toContain("exit_plan_mode");
+			permissions?.setMode("plan");
+			expect(harness.session.getActiveToolNames()).toContain("exit_plan_mode");
+			expect(harness.session.systemPrompt).toContain("Plan mode is active");
+			permissions?.setMode("manual");
+			expect(harness.session.getActiveToolNames()).not.toContain("exit_plan_mode");
+			expect(harness.session.systemPrompt).not.toContain("Plan mode is active");
+		});
+
+		it("approving switches to the chosen mode and the implementation runs", async () => {
+			const { harness, executed } = await setup({ mode: "plan" });
+			const dialogs = await bindPlanUi(harness, ["Implement in accept edits"]);
+			respond(harness, ["exit_plan_mode", { plan: "1. write a.txt" }], ["write", { path: "a.txt", content: "x" }]);
+			await harness.session.prompt("go");
+			expect(dialogs).toHaveLength(1);
+			expect(dialogs[0].options).toEqual(["Implement in accept edits", "Implement in manual", "Keep planning"]);
+			expect(harness.session.permissions?.mode).toBe("acceptEdits");
+			expect(getMessageText(getToolResult(harness, "exit_plan_mode"))).toContain("now accept edits");
+			expect(executed).toEqual(["write:a.txt"]);
+			expect(harness.session.getActiveToolNames()).not.toContain("exit_plan_mode");
+		});
+
+		it("offers auto when it is available", async () => {
+			const { harness } = await setup({
+				mode: "plan",
+				settings: { permissions: { auto: { model: "faux/faux-1" } } },
+			});
+			const dialogs = await bindPlanUi(harness, ["Implement in auto"]);
+			respond(harness, ["exit_plan_mode", { plan: "do it" }]);
+			await harness.session.prompt("go");
+			expect(dialogs[0].options).toContain("Implement in auto");
+			expect(harness.session.permissions?.mode).toBe("auto");
+		});
+
+		it("keep planning with feedback stays in plan mode and continues the turn", async () => {
+			const { harness } = await setup({ mode: "plan" });
+			await bindPlanUi(harness, ["Keep planning"], "cover the tests");
+			respond(harness, ["exit_plan_mode", { plan: "do it" }]);
+			await harness.session.prompt("go");
+			expect(harness.session.permissions?.mode).toBe("plan");
+			expect(getMessageText(getToolResult(harness, "exit_plan_mode"))).toContain("cover the tests");
+			expect(getAssistantTexts(harness)).toContain("done");
+		});
+
+		it("keep planning without feedback aborts the turn", async () => {
+			const { harness } = await setup({ mode: "plan" });
+			await bindPlanUi(harness, ["Keep planning"], "");
+			respond(harness, ["exit_plan_mode", { plan: "do it" }]);
+			await harness.session.prompt("go");
+			expect(harness.session.permissions?.mode).toBe("plan");
+			expect(getAssistantTexts(harness)).not.toContain("done");
+		});
+
+		it("stays in plan mode when no one can approve", async () => {
+			const { harness } = await setup({ mode: "plan" });
+			respond(harness, ["exit_plan_mode", { plan: "do it" }]);
+			await harness.session.prompt("go");
+			expect(harness.session.permissions?.mode).toBe("plan");
+			expect(getMessageText(getToolResult(harness, "exit_plan_mode"))).toContain("No one can approve the plan");
+		});
+
+		it("plan mode may write the plan file, even in a protected directory", async () => {
+			const executed: string[] = [];
+			const write: AgentTool = {
+				name: "write",
+				label: "write",
+				description: "Write a file",
+				parameters: Type.Object({ path: Type.String(), content: Type.String() }),
+				execute: async (_id, params) => {
+					executed.push((params as { path: string }).path);
+					return { content: [{ type: "text", text: "written" }], details: {} };
+				},
+			};
+			const planDir = mkdtempSync(join(tmpdir(), "stela-plan-"));
+			// `.stela` is a protected path component, like the agent directory where the CLI keeps plans.
+			const planFilePath = join(planDir, ".stela", "plans", "session.md");
+			const harness = await createHarness({ tools: [write], permissions: { initialMode: "plan", planFilePath } });
+			harnesses.push(harness);
+			try {
+				respond(
+					harness,
+					["write", { path: planFilePath, content: "plan" }],
+					["write", { path: "a.txt", content: "x" }],
+				);
+				await harness.session.prompt("go");
+				expect(executed).toEqual([planFilePath]);
+				expect(harness.session.systemPrompt).toContain(planFilePath);
+			} finally {
+				rmSync(planDir, { recursive: true, force: true });
+			}
+		});
 	});
 });

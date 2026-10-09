@@ -485,7 +485,13 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		extensionRunnerRef,
 		sessionStartEvent: options.sessionStartEvent,
 		permissionController: options.permissions
-			? new PermissionController({ ...options.permissions, cwd, agentDir, settingsManager })
+			? new PermissionController({
+					...options.permissions,
+					cwd,
+					agentDir,
+					settingsManager,
+					planFilePath: join(agentDir, "plans", `${sessionManager.getSessionId()}.md`),
+				})
 			: undefined,
 	});
 

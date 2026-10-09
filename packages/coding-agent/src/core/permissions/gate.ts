@@ -116,7 +116,7 @@ export function decidePermission(tool: string, args: unknown, ctx: GateContext):
 	}
 
 	if (ctx.mode !== "bypassPermissions") {
-		const protectedPath = findProtectedPath(targets, ctx.agentDir);
+		const protectedPath = findProtectedPath(targets, ctx.agentDir, ctx.planFilePath);
 		if (protectedPath) {
 			return {
 				action: "ask",
@@ -184,9 +184,15 @@ function planModeDenial(
 	return undefined;
 }
 
-function findProtectedPath(targets: readonly PermissionTarget[], agentDir: string): string | undefined {
+function findProtectedPath(
+	targets: readonly PermissionTarget[],
+	agentDir: string,
+	planFilePath: string | undefined,
+): string | undefined {
 	for (const target of targets) {
 		if (target.kind !== "read" && target.kind !== "edit") continue;
+		// The plan file lives in the agent directory, which is protected; plan mode must still be able to write it.
+		if (target.path === planFilePath) continue;
 		const kind = getProtectedPathKind(target.path, agentDir);
 		if (kind === "secret" || (kind === "config" && target.kind === "edit")) return target.path;
 	}

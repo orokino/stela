@@ -13,7 +13,7 @@ import {
 	type PermissionModeAvailability,
 	parsePermissionMode,
 } from "./modes.ts";
-import { createPathScope } from "./paths.ts";
+import { createPathScope, realpathAllowMissing } from "./paths.ts";
 import { type PermissionRule, parseRules, type RuleAction, type RuleSource } from "./rules.ts";
 
 /** Project-local grants written by "Always in this project", next to project settings. */
@@ -65,6 +65,8 @@ export interface PermissionControllerOptions {
 	additionalDirectories?: string[];
 	/** Injected in tests; defaults to the tree-sitter analyzer. */
 	analyzeShell?: ShellAnalyzer;
+	/** The one file plan mode may write: a draft of the plan. */
+	planFilePath?: string;
 }
 
 export type PermissionModeListener = (mode: PermissionMode, previous: PermissionMode) => void;
@@ -80,6 +82,8 @@ export class PermissionController {
 	private readonly settingsManager: SettingsManager;
 	private readonly cliAllowBypass: boolean;
 	private readonly cliDirectories: string[];
+	/** The one file plan mode may write, if any. */
+	readonly planFilePath: string | undefined;
 	private readonly sessionRules: PermissionRule[] = [];
 	private readonly listeners = new Set<PermissionModeListener>();
 	private analyzer: Promise<ShellAnalyzer>;
@@ -93,6 +97,7 @@ export class PermissionController {
 		this.settingsManager = options.settingsManager;
 		this.cliAllowBypass = options.allowBypass ?? false;
 		this.cliDirectories = options.additionalDirectories ?? [];
+		this.planFilePath = options.planFilePath;
 		this.analyzer = options.analyzeShell ? Promise.resolve(options.analyzeShell) : loadShellAnalyzer();
 		const configured = parsePermissionMode(this.settingsManager.getSettings().permissions?.defaultMode ?? "");
 		const initial = options.initialMode ?? configured ?? DEFAULT_PERMISSION_MODE;
@@ -165,6 +170,7 @@ export class PermissionController {
 			scope: createPathScope(this.cwd, directories),
 			agentDir: this.agentDir,
 			analyzeShell: await this.analyzer,
+			planFilePath: this.planFilePath ? realpathAllowMissing(this.planFilePath) : undefined,
 		});
 	}
 
