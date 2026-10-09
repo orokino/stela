@@ -190,9 +190,12 @@ The approved plan, with phase details, decision ledger and implementation outlin
   handoff, bash approval and auto mode (allow, deny, uncertain, Esc). Tools and how to rerun them:
   `docs/research/permissions/smoke/README.md` (git-ignored).
 - Bun binary wasm paths verified in 5.7 below.
-- `./test.sh` has failures that are not from this work: `fd` tests offline, tests still expecting pi names after the
-  Stela cutover, unbuilt artifacts (pi-ai entry, chord, env daemon), a flaky `auth-storage` test, and 4 pi-ai
-  model-metadata tests.
+- `./test.sh` (2026-10-09, after cleanup commits `1d98f6bd0` and `ac98f5a68`): coding-agent rename leftovers fixed
+  (tests use `APP_NAME`), and the #5943 rebind regression from the permission footer subscription fixed. Remaining
+  failures, all environmental: `find` tool tests (10; no system `fd`, and the download inside the isolated test
+  home fails), `packages/env` (5 files; the Rust `pi-env` daemon is not built), 2 pi-ai model-metadata tests
+  (catalog older than test expectations; refreshing needs the network model regeneration), and the flaky
+  `auth-storage` coalesced-reload test.
 - Follow-ups 5.1–5.6 of `PLAN.md` "Remaining" are done (2026-10-09), one commit each: `0228b8f75` plan mode denies
   protected paths (user: deny); `e33591165` dangerous-command risk list, allowed only by an exact rule (user: enforce
   at rule matching); `9f7639edb` approval dialog reported as OSC 7501 `kind=permission` with only its first title
@@ -242,19 +245,15 @@ The approved plan, with phase details, decision ledger and implementation outlin
    the actual CLI/TUI path. Apply the frozen visual tokens when UI work begins. No automatic prototype
    port, recovered prompt import, extension inlining, GUI launch, or SQLite migration.
 
-Candidate next steps (pick one; none started):
-1. **Test-suite cutover cleanup:** make `./test.sh` green apart from network-only tests. Known failures: tests
-   still expecting pi names (e.g. `test/program-status-reporter.test.ts` expects app `pi`), unbuilt-artifact
-   tests (pi-ai entry, chord, env daemon), offline `fd` tests, a flaky `auth-storage` test, 4 pi-ai
-   model-metadata tests. Small and makes later regressions visible.
-2. **Next capability** per steps 1-3 above. Candidates the README names as missing from upstream: sub-agents
-   (Stela-native, not Orca), and a Stela theme applying the frozen visual tokens.
-3. **Execute the new install docs:** a Docker build of `Dockerfile.stela` (heavy; ask first) and, if a device
-   is available, the Termux steps.
+Next session (user's choice): **UI/UX, with RE of the other CLIs' TUIs, scoped like the permission-modes RE.** Reuse the Phase 1
+approach from permission modes: one capability-scoped question list, the 7 targets' existing reports and REA/Ghidra
+tooling (capped toolkit, one heavy worker at a time), then decisions, then implementation with the frozen visual
+tokens. Test cleanup is done (see above); executing the new Docker/Termux docs is still open.
 
-Suggested opening prompt (test cleanup):
+Suggested opening prompt (UI/UX):
 
-> Stela. Read HANDOFF.md "Current work — permission modes" and "Next session". Run ./test.sh once
-> (no full vitest), classify each failure as cutover leftover, unbuilt artifact, network, or flaky, and
-> ask me before changing any test that encodes upstream behavior. Fix the cutover leftovers with
-> npm run check clean, one commit per group. Do not overload the machine.
+> Stela. Read HANDOFF.md ("Agreed direction", "Frozen visual tokens", "Current work") and
+> docs/research/permissions/ for how the permission-modes RE was scoped. Propose a UI/UX-only question
+> list for reverse engineering the other CLIs' TUIs (claude-code, codex, opencode, cursor-agent, omp,
+> grok, devin) and ask me to approve it before starting any worker. Workers: gpt-6-luna, effort max,
+> one heavy worker at a time. Do not overload the machine.
