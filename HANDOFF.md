@@ -183,8 +183,16 @@ The approved plan, with phase details, decision ledger and implementation outlin
   Stela cutover, unbuilt artifacts (pi-ai entry, chord, env daemon), a flaky `auth-storage` test, and 4 pi-ai
   model-metadata tests.
 - Not verified: the npm bundle and Bun binary wasm paths (`npm run build` was not run).
-- Next: step 5 (`exit_plan_mode`), step 6 (auto classifier), the D14 extension API, then step 7 (docs, RPC smoke
-  test, build verification). Details and small follow-ups are under "Remaining" in `PLAN.md`.
+- Steps 5, 6 and the D14 extension API are committed (2026-10-09):
+  - `95d0f3f36`: `exit_plan_mode` (declared only in plan mode; implement in accept edits / manual / auto, or keep
+    planning) and the plan file `<agentDir>/plans/<session-id>.md`.
+  - `acbfc22bd`: auto mode classifier (`core/permissions/auto-decider.ts`): model call to `permissions.auto.model`,
+    fail-to-ask (deny headless), timeout clamp 1–120 s, 3/20 denial breaker.
+  - `9d993606b`: `ctx.permissions.getMode()/setMode()` and the `permission_mode_change` event.
+  - Tests: 74 across the five permission test files. `npm run check` is clean.
+- Not verified live: the `exit_plan_mode` dialog and auto mode in the TUI (only through the faux-provider suite).
+- Next: step 7 (docs, RPC smoke test, tmux check of plan handoff, build verification). `npm run build` needs the
+  user's go-ahead. Small follow-ups are under "Remaining" in `PLAN.md`.
 
 **Operational lessons (see also Claude memory `rea-reliability`):**
 - **Load:**
@@ -211,7 +219,7 @@ The approved plan, with phase details, decision ledger and implementation outlin
 Suggested opening prompt (permission modes, in progress):
 
 > Stela. Read HANDOFF.md "Current work — permission modes" and the "Remaining" list in
-> docs/research/permissions/PLAN.md. Steps 1–4 are committed. Continue with step 5 (exit_plan_mode),
-> then step 6 (auto-mode classifier with fail-to-ask, timeout and breaker), then the D14 extension
-> API, each with tests and npm run check, and commit each step. Ask me before running npm run build
-> for step 7. Do not overload the machine.
+> docs/research/permissions/PLAN.md. Steps 1–6 and the D14 extension API are committed. Do step 7:
+> docs/permissions.md, an RPC approval smoke test, a tmux check of the exit_plan_mode handoff and auto
+> mode, then the build verification of the wasm paths. Ask me before running npm run build.
+> Do not overload the machine.
