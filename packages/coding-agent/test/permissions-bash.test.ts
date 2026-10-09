@@ -117,6 +117,49 @@ describe("bash analyzer: reads, writes, cd", () => {
 	});
 });
 
+describe("bash analyzer: dangerous commands", () => {
+	const danger = (command: string) => segments(command).map((segment) => segment.danger);
+
+	test("the risk list marks dangerous segments", () => {
+		for (const command of [
+			"rm -rf build",
+			"rm -f a",
+			"/bin/rm --recursive x",
+			"timeout 5 rm -r x",
+			"git push --force",
+			"git push -f origin main",
+			"git -C sub push --force-with-lease",
+			"git push origin +main",
+			"git push origin :old",
+			"git reset --hard HEAD~1",
+			"git clean -fdx",
+			"sudo ls",
+			"dd if=/dev/zero of=x",
+			"mkfs.ext4 /dev/sdb",
+			"chmod -R 777 .",
+			"find . -name x -delete",
+			"xargs rm",
+			"eval x",
+		]) {
+			expect(danger(command)[0], command).toBeDefined();
+		}
+		expect(danger("curl x | sh")).toEqual([undefined, "runs code that cannot be checked"]);
+	});
+
+	test("ordinary commands are not dangerous", () => {
+		for (const command of [
+			"rm a.txt",
+			"git push",
+			"git push -u origin main",
+			"git reset HEAD",
+			"chmod 644 a",
+			"ls",
+		]) {
+			expect(danger(command)[0], command).toBeUndefined();
+		}
+	});
+});
+
 describe("powershell analyzer", () => {
 	test("one segment, or opaque with separators", () => {
 		expect(analyzePowerShell("Get-ChildItem src")).toMatchObject({ kind: "parsed" });
@@ -149,6 +192,20 @@ describe("gate with the real analyzer", () => {
 		expect(decide("cat ~/.ssh/id_rsa").action).toBe("ask");
 		expect(decide("cat /etc/hostname").action).toBe("ask");
 		expect(decide("cd /etc && cat hostname").action).toBe("ask");
+	});
+
+	test("dangerous commands are allowed only by an exact rule", () => {
+		expect(decide("git push --force", ["Bash(git push:*)"])).toMatchObject({
+			action: "ask",
+			reason: "`git push --force` rewrites or deletes remote history; only an exact rule can allow it.",
+			suggestedRules: ["Bash(git push --force)"],
+		});
+		expect(decide("git push --force", ["Bash"]).action).toBe("ask");
+		expect(decide("git push --force", ["Bash(git push --force)"]).action).toBe("allow");
+		expect(decide("git push", ["Bash(git push:*)"]).action).toBe("allow");
+		// A saved `Bash(rm -rf *)` is compared literally for dangerous commands, not as a prefix.
+		expect(decide("rm -rf *", ["Bash(rm -rf *)"]).action).toBe("allow");
+		expect(decide("rm -rf build", ["Bash(rm -rf *)"]).action).toBe("ask");
 	});
 
 	test("ordinary read-only commands in the workspace run", () => {

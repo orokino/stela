@@ -22,6 +22,9 @@ import type { ShellAnalysis, ShellAnalyzer, ShellSegment } from "./gate.ts";
  * benign); file arguments of read-only commands are reported as reads. Paths are resolved against the session cwd,
  * following static `cd` within the line.
  *
+ * Dangerous commands (`rm -rf`, `git push --force`, `sudo`, a shell reading `curl` output, ...) carry a `danger`
+ * reason; the gate then allows them only through an allow rule for the exact command.
+ *
  * PowerShell is not parsed: a command is one segment, and any separator, pipe, substitution or redirect makes it
  * opaque.
  */
@@ -222,7 +225,8 @@ function visitCommand(node: Node, walk: Walk, inheritedWrites: readonly string[]
 				walk,
 			)
 		: [];
-	walk.segments.push({ command: text, readOnly, writes: resolvePaths(writes, walk), reads });
+	const danger = dangerOf(argv.map((word) => word.text));
+	walk.segments.push({ command: text, readOnly, writes: resolvePaths(writes, walk), reads, danger });
 }
 
 function checkAssignment(node: Node, walk: Walk): void {
@@ -489,6 +493,76 @@ function isReadOnlyGit(args: string[]): boolean {
 			return rest.length === 0 || rest[0] === "show";
 		default:
 			return false;
+	}
+}
+
+const SHELLS_AND_EVALUATORS = new Set(["sh", "bash", "zsh", "dash", "ksh", "eval", "source", ".", "xargs"]);
+const DISK_TOOLS = new Set(["dd", "shred", "wipefs"]);
+const RECURSIVE_OWNERSHIP = new Set(["chmod", "chown", "chgrp"]);
+
+/** Risk list (D5/D7): why a command is dangerous, or undefined. */
+function dangerOf(argv: string[]): string | undefined {
+	const program = basename(argv[0]);
+	const args = argv.slice(1);
+	const { hasShortFlag, hasLong } = optionTests(args);
+	switch (program) {
+		case "rm":
+			return hasShortFlag(/[rRf]/) || hasLong("--recursive", "--force")
+				? "deletes recursively or forcibly"
+				: undefined;
+		case "sudo":
+		case "su":
+		case "doas":
+			return "runs a command as another user";
+		case "find":
+			return hasLong("-delete", "-exec", "-execdir", "-ok", "-okdir") ? "deletes files or runs commands" : undefined;
+		case "git":
+			return dangerOfGit(args);
+	}
+	if (DISK_TOOLS.has(program) || program === "mkfs" || program.startsWith("mkfs.")) return "overwrites disks or files";
+	if (RECURSIVE_OWNERSHIP.has(program) && (hasShortFlag(/R/) || hasLong("--recursive"))) {
+		return "changes permissions or ownership recursively";
+	}
+	if (SHELLS_AND_EVALUATORS.has(program)) return "runs code that cannot be checked";
+	return undefined;
+}
+
+/** `hasShortFlag(/[rf]/)` matches `-r`, `-rf` and `-fr`; `hasLong("--force")` matches `--force` and `--force=x`. */
+function optionTests(args: readonly string[]) {
+	const options = args.filter((arg) => arg.startsWith("-") && arg !== "-");
+	return {
+		hasShortFlag: (letters: RegExp) => options.some((arg) => !arg.startsWith("--") && letters.test(arg.slice(1))),
+		hasLong: (...flags: string[]) =>
+			options.some((arg) => flags.some((flag) => arg === flag || arg.startsWith(`${flag}=`))),
+	};
+}
+
+/** Git options that take a separate value before the subcommand. */
+const GIT_VALUE_OPTIONS = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"]);
+
+function dangerOfGit(args: string[]): string | undefined {
+	let index = 0;
+	while (index < args.length && args[index].startsWith("-")) {
+		index += GIT_VALUE_OPTIONS.has(args[index]) ? 2 : 1;
+	}
+	const sub = args[index];
+	const rest = args.slice(index + 1);
+	const { hasShortFlag, hasLong } = optionTests(rest);
+	switch (sub) {
+		case "push": {
+			const refspecs = rest.filter((arg) => !arg.startsWith("-")).slice(1);
+			const rewrites =
+				hasShortFlag(/[fd]/) ||
+				hasLong("--force", "--force-with-lease", "--force-if-includes", "--mirror", "--delete", "--prune") ||
+				refspecs.some((ref) => ref.startsWith("+") || ref.startsWith(":"));
+			return rewrites ? "rewrites or deletes remote history" : undefined;
+		}
+		case "reset":
+			return hasLong("--hard") ? "discards uncommitted changes" : undefined;
+		case "clean":
+			return hasShortFlag(/f/) || hasLong("--force") ? "deletes untracked files" : undefined;
+		default:
+			return undefined;
 	}
 }
 

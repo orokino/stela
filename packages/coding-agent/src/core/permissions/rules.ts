@@ -20,7 +20,7 @@ export interface PermissionRule {
  * one per shell segment.
  */
 export type PermissionTarget =
-	| { kind: "shell"; tool: string; command: string }
+	| { kind: "shell"; tool: string; command: string; danger?: string }
 	| { kind: "read"; tool: string; path: string }
 	| { kind: "edit"; tool: string; path: string }
 	| { kind: "fetch"; tool: string; host: string }
@@ -145,6 +145,11 @@ export function matchesShellPattern(pattern: string, command: string): boolean {
 		return regex.test(command);
 	}
 	return command === pattern;
+}
+
+/** True when the rule names exactly this shell command, compared literally (a `*` in the command is not a glob). */
+export function isExactShellRule(rule: PermissionRule, target: PermissionTarget & { kind: "shell" }): boolean {
+	return rule.specifier === target.command && matchesTool(rule, target);
 }
 
 function matchesDomain(pattern: string, host: string): boolean {

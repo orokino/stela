@@ -8,7 +8,7 @@ import {
 	realpathAllowMissing,
 	resolvePermissionPath,
 } from "./paths.ts";
-import { describeRule, findRule, type PermissionRule, type PermissionTarget } from "./rules.ts";
+import { describeRule, findRule, isExactShellRule, type PermissionRule, type PermissionTarget } from "./rules.ts";
 
 /** One simple command of a shell line, after wrappers and safe env prefixes are removed. */
 export interface ShellSegment {
@@ -20,6 +20,8 @@ export interface ShellSegment {
 	writes: string[];
 	/** Absolute paths a read-only segment reads; checked like `read` tool paths (scope, secrets). */
 	reads: string[];
+	/** Why the command is dangerous, e.g. "deletes recursively or forcibly". Only an exact allow rule allows it. */
+	danger?: string;
 }
 
 /** A parsed shell line, or `opaque` when it cannot be analyzed safely (it then always asks). */
@@ -85,7 +87,7 @@ export function decidePermission(tool: string, args: unknown, ctx: GateContext):
 				break;
 			}
 			for (const segment of analysis.segments) {
-				const target: PermissionTarget = { kind: "shell", tool, command: segment.command };
+				const target: PermissionTarget = { kind: "shell", tool, command: segment.command, danger: segment.danger };
 				targets.push(target);
 				if (segment.readOnly && segment.writes.length === 0) readOnlySegments.add(target);
 				for (const read of segment.reads) {
@@ -212,6 +214,10 @@ function isTargetAllowed(
 	readOnlySegments: ReadonlySet<PermissionTarget>,
 	ctx: GateContext,
 ): boolean {
+	// A dangerous command needs an allow rule for exactly this command; prefix, glob and bare-tool rules do not count.
+	if (target.kind === "shell" && target.danger !== undefined) {
+		return ctx.rules.some((rule) => rule.action === "allow" && isExactShellRule(rule, target));
+	}
 	if (findRule(ctx.rules, "allow", target, ctx.cwd)) return true;
 	switch (target.kind) {
 		case "read":
@@ -231,6 +237,11 @@ function describeAsk(unallowed: readonly PermissionTarget[], scope: readonly str
 	for (const target of unallowed) {
 		if ((target.kind === "read" || target.kind === "edit") && !isWithinScope(target.path, scope)) {
 			return `${displayPath(target.path, realCwd)} is outside the workspace.`;
+		}
+	}
+	for (const target of unallowed) {
+		if (target.kind === "shell" && target.danger !== undefined) {
+			return `\`${target.command}\` ${target.danger}; only an exact rule can allow it.`;
 		}
 	}
 	return "No permission rule allows this call.";
