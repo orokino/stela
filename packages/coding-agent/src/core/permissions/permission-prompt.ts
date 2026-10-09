@@ -27,9 +27,13 @@ export function createUIPermissionPrompter(ui: Pick<ExtensionUIContext, "select"
 			case YES:
 				return { kind: "once" };
 			case YES_SESSION:
-				return { kind: "session" };
-			case ALWAYS_PROJECT:
-				return { kind: "project" };
+			case ALWAYS_PROJECT: {
+				const kind = choice === YES_SESSION ? "session" : "project";
+				if (prompt.ruleChoices.length < 2) return { kind };
+				// Let the user widen the rule before saving, e.g. `Bash(npm test)` to `Bash(npm:*)`.
+				const rule = await ui.select("Save which rule?", prompt.ruleChoices, { signal, kind: "permission" });
+				return rule === undefined ? undefined : { kind, rules: [rule] };
+			}
 			case ACCEPT_EDITS:
 				return { kind: "acceptEdits" };
 			case NO_FEEDBACK: {

@@ -214,6 +214,38 @@ describe("permission gate", () => {
 		expect(decide("read", { path: ".git/config" }, { mode: "plan" }).action).toBe("allow");
 	});
 
+	test("rule choices widen one suggested rule, narrowest first", () => {
+		const choices = (tool: string, args: unknown) => {
+			const decision = decide(tool, args);
+			return decision.action === "ask" ? decision.ruleChoices : undefined;
+		};
+		expect(choices("bash", { command: "npm run build" })).toEqual([
+			"Bash(npm run build)",
+			"Bash(npm run:*)",
+			"Bash(npm:*)",
+		]);
+		expect(choices("bash", { command: "make" })).toEqual(["Bash(make)", "Bash(make:*)"]);
+		mkdirSync(join(cwd, "src", "core"), { recursive: true });
+		expect(choices("edit", { path: "src/core/a.ts", edits: [] })).toEqual([
+			"Edit(./src/core/a.ts)",
+			"Edit(./src/core/**)",
+			"Edit(./src/**)",
+			"Edit(./**)",
+		]);
+		expect(choices("read", { path: join(root, "other", "x.txt") })).toEqual([
+			`Read(${join(root, "other", "x.txt")})`,
+			`Read(${join(root, "other")}/**)`,
+		]);
+		expect(choices("mcp__github__create_issue", {})).toEqual(["mcp__github__create_issue", "mcp__github__*"]);
+		expect(choices("webfetch", { url: "https://docs.api.example.com/x" })).toEqual([
+			"WebFetch(domain:docs.api.example.com)",
+			"WebFetch(domain:*.api.example.com)",
+			"WebFetch(domain:*.example.com)",
+		]);
+		// Two suggested rules: saved as they are.
+		expect(choices("bash", { command: "npm test && curl x" })).toEqual([]);
+	});
+
 	test("bypass: no prompts, but deny rules still block", () => {
 		const denyRm = rules({ deny: ["Bash(rm:*)"] });
 		expect(decide("bash", { command: "npm test" }, { mode: "bypassPermissions" }).action).toBe("allow");

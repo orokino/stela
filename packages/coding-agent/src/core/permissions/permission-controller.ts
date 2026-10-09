@@ -34,6 +34,8 @@ export interface PermissionPrompt {
 	reason: string;
 	/** Rules the "for this session" and "always in this project" answers would add. */
 	suggestedRules: string[];
+	/** The suggested rule followed by wider alternatives, when the user may pick one before saving; else empty. */
+	ruleChoices: string[];
 	/** Whether "always in this project" is offered (the project is trusted). */
 	canSaveToProject: boolean;
 	/** Whether "accept edits for this session" is offered (a file edit in manual mode). */
@@ -42,8 +44,8 @@ export interface PermissionPrompt {
 
 export type PermissionAnswer =
 	| { kind: "once" }
-	| { kind: "session" }
-	| { kind: "project" }
+	| { kind: "session"; rules?: string[] }
+	| { kind: "project"; rules?: string[] }
 	| { kind: "acceptEdits" }
 	| { kind: "deny"; feedback?: string };
 
@@ -236,6 +238,7 @@ export class PermissionController {
 				summary: summarizeCall(args),
 				reason: decision.reason,
 				suggestedRules: decision.suggestedRules,
+				ruleChoices: decision.ruleChoices,
 				canSaveToProject: decision.suggestedRules.length > 0 && this.settingsManager.isProjectTrusted(),
 				canAcceptEdits: isEdit && this.currentMode === "manual",
 			},
@@ -246,10 +249,10 @@ export class PermissionController {
 			case "once":
 				return { block: false };
 			case "session":
-				this.grantForSession(decision.suggestedRules);
+				this.grantForSession(answer.rules ?? decision.suggestedRules);
 				return { block: false };
 			case "project":
-				this.grantForProject(decision.suggestedRules);
+				this.grantForProject(answer.rules ?? decision.suggestedRules);
 				return { block: false };
 			case "acceptEdits":
 				this.setMode("acceptEdits");

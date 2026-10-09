@@ -87,6 +87,7 @@ describe("permission modes UI", () => {
 			summary: "git push",
 			reason: "No permission rule allows this call.",
 			suggestedRules: ["Bash(git push)"],
+			ruleChoices: [],
 			canSaveToProject: false,
 			canAcceptEdits: false,
 		});

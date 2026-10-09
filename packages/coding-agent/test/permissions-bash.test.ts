@@ -199,6 +199,7 @@ describe("gate with the real analyzer", () => {
 			action: "ask",
 			reason: "`git push --force` rewrites or deletes remote history; only an exact rule can allow it.",
 			suggestedRules: ["Bash(git push --force)"],
+			ruleChoices: [],
 		});
 		expect(decide("git push --force", ["Bash"]).action).toBe("ask");
 		expect(decide("git push --force", ["Bash(git push --force)"]).action).toBe("allow");

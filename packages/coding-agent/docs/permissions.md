@@ -122,6 +122,7 @@ Rule: Bash(npm run build), Bash(npm test)
 ```
 
 - "Yes, for this session" and "Always in this project" add the rules shown under `Rule:`. The project option is offered only in trusted projects. It writes `.stela/permissions.local.json` and adds that file to `.stela/.gitignore`.
+- When one rule is shown, both options then ask which rule to save: the exact rule or a wider one, for example `Bash(npm run build)`, `Bash(npm run:*)`, or `Bash(npm:*)`; `Edit(./src/core/a.ts)`, `Edit(./src/core/**)`, ...; `WebFetch(domain:*.example.com)`; `mcp__github__*`. Dangerous commands are saved only as the exact command. `Esc` there cancels the call like `Esc` in the dialog.
 - For a file edit in manual mode, "Yes, and accept edits for this session" switches to accept edits.
 - "No, and tell the model why" returns your text to the model, and the turn continues.
 - "No" or `Esc` stops the turn and gives control back to you.

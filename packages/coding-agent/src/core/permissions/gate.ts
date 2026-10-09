@@ -1,4 +1,4 @@
-import { relative } from "node:path";
+import { dirname, relative } from "node:path";
 import { classifyToolCall } from "./classify-tool.ts";
 import type { PermissionMode } from "./modes.ts";
 import {
@@ -53,6 +53,11 @@ export type PermissionDecision =
 			classifiable: boolean;
 			/** Rules that would allow this call, offered by the dialog's "always" options. */
 			suggestedRules: string[];
+			/**
+			 * When exactly one rule is suggested: that rule, then wider rules the user may save instead
+			 * (`Bash(npm run build)`, `Bash(npm run:*)`, `Bash(npm:*)`). Empty otherwise and for dangerous commands.
+			 */
+			ruleChoices: string[];
 	  };
 
 /**
@@ -131,6 +136,7 @@ export function decidePermission(tool: string, args: unknown, ctx: GateContext):
 				reason: `This call touches a protected path: ${displayPath(protectedPath, realCwd)}.`,
 				classifiable: false,
 				suggestedRules: [],
+				ruleChoices: [],
 			};
 		}
 	}
@@ -143,6 +149,7 @@ export function decidePermission(tool: string, args: unknown, ctx: GateContext):
 				reason: `Permission rule ${describeRule(rule)} requires approval.`,
 				classifiable: false,
 				suggestedRules: [],
+				ruleChoices: [],
 			};
 		}
 	}
@@ -155,18 +162,71 @@ export function decidePermission(tool: string, args: unknown, ctx: GateContext):
 			reason: `The command could not be analyzed safely (${opaqueReason}).`,
 			classifiable: ctx.mode === "auto",
 			suggestedRules: [],
+			ruleChoices: [],
 		};
 	}
 
 	const unallowed = targets.filter((target) => !isTargetAllowed(target, readOnlySegments, ctx));
 	if (unallowed.length === 0) return { action: "allow", reason: "Allowed by permission rules and mode." };
 
+	const suggestedRules = [...new Set(unallowed.map((target) => suggestRule(target, realCwd)))];
+	const widenable = suggestedRules.length === 1 && unallowed.every((target) => !isDangerous(target));
+	const wider = widenable ? widerRules(unallowed[0], realCwd) : [];
 	return {
 		action: "ask",
 		reason: describeAsk(unallowed, ctx.scope, realCwd),
 		classifiable: ctx.mode === "auto",
-		suggestedRules: [...new Set(unallowed.map((target) => suggestRule(target, realCwd)))],
+		suggestedRules,
+		ruleChoices: wider.length > 0 ? [suggestedRules[0], ...wider] : [],
 	};
+}
+
+function isDangerous(target: PermissionTarget): boolean {
+	return target.kind === "shell" && target.danger !== undefined;
+}
+
+/** Wider rules covering the target, narrowest first. */
+function widerRules(target: PermissionTarget, cwd: string): string[] {
+	switch (target.kind) {
+		case "shell": {
+			// Word prefixes of up to two words: `npm run build` → `npm run:*`, `npm:*`. A `*` would turn into a glob.
+			const words = target.command.split(" ");
+			const toolName = target.tool === "powershell" ? "PowerShell" : "Bash";
+			const rules: string[] = [];
+			for (let count = Math.min(2, words.length); count >= 1; count--) {
+				const prefix = words.slice(0, count).join(" ");
+				if (!prefix.includes("*")) rules.push(`${toolName}(${prefix}:*)`);
+			}
+			return rules;
+		}
+		case "read":
+		case "edit": {
+			// Up to three parent directories, stopping at the working directory or the filesystem root.
+			const toolName = target.kind === "read" ? "Read" : "Edit";
+			const rules: string[] = [];
+			let dir = dirname(target.path);
+			for (let level = 0; level < 3 && dir !== dirname(dir); level++) {
+				if (!isPathWithin(dir, cwd) && isPathWithin(cwd, dir)) break;
+				rules.push(`${toolName}(${dir === cwd ? "./" : `${rulePath(dir, cwd)}/`}**)`);
+				if (dir === cwd) break;
+				dir = dirname(dir);
+			}
+			return rules;
+		}
+		case "fetch": {
+			// `docs.api.example.com` → `*.api.example.com`, `*.example.com`.
+			const labels = target.host.split(".");
+			const rules: string[] = [];
+			for (let start = 1; labels.length - start >= 2; start++) {
+				rules.push(`WebFetch(domain:*.${labels.slice(start).join(".")})`);
+			}
+			return rules;
+		}
+		case "tool": {
+			const server = /^(mcp__.+?__)./.exec(target.tool);
+			return server ? [`${server[1]}*`] : [];
+		}
+	}
 }
 
 const PLAN_MODE_SUFFIX = "Investigate and present the plan instead; the user decides when to leave plan mode.";

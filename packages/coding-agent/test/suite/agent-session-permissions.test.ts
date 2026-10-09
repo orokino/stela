@@ -128,21 +128,39 @@ describe("permission gate in AgentSession", () => {
 
 	it("a session grant stops later prompts for the same command", async () => {
 		const { harness, executed } = await setup();
-		const prompts = await bindUi(harness, ["Yes, for this session"]);
+		const prompts = await bindUi(harness, ["Yes, for this session", "Bash(npm test)"]);
 		respond(harness, ["bash", { command: "npm test" }], ["bash", { command: "npm test" }]);
 		await harness.session.prompt("go");
 		expect(executed).toEqual(["bash:npm test", "bash:npm test"]);
-		expect(prompts).toHaveLength(1);
+		expect(prompts).toEqual([expect.stringContaining("Allow bash?"), "Save which rule?"]);
+	});
+
+	it("a widened session grant covers related commands", async () => {
+		const { harness, executed } = await setup();
+		const prompts = await bindUi(harness, ["Yes, for this session", "Bash(npm:*)"]);
+		respond(harness, ["bash", { command: "npm test" }], ["bash", { command: "npm run build" }]);
+		await harness.session.prompt("go");
+		expect(executed).toEqual(["bash:npm test", "bash:npm run build"]);
+		expect(prompts).toHaveLength(2);
+	});
+
+	it("cancelling the rule choice cancels the call", async () => {
+		const { harness, executed } = await setup();
+		await bindUi(harness, ["Yes, for this session"]);
+		respond(harness, ["bash", { command: "npm test" }]);
+		await harness.session.prompt("go");
+		expect(executed).toEqual([]);
+		expect(getAssistantTexts(harness)).not.toContain("done");
 	});
 
 	it("a project grant is written to .stela/permissions.local.json and gitignored", async () => {
 		const { harness } = await setup();
-		await bindUi(harness, ["Always in this project"]);
+		await bindUi(harness, ["Always in this project", "Bash(npm test:*)"]);
 		respond(harness, ["bash", { command: "npm test" }]);
 		await harness.session.prompt("go");
 		const dir = join(harness.tempDir, ".stela");
 		expect(JSON.parse(readFileSync(join(dir, "permissions.local.json"), "utf8"))).toEqual({
-			allow: ["Bash(npm test)"],
+			allow: ["Bash(npm test:*)"],
 		});
 		expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe("permissions.local.json\n");
 	});
