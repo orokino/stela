@@ -118,6 +118,8 @@ import { type BashExecutionMessage, type CustomMessage, convertToLlm } from "./m
 import { ModelRegistry } from "./model-registry.ts";
 import type { ModelRuntime } from "./model-runtime.ts";
 import { NestedToolCallRunner } from "./nested-tool-calls.ts";
+import type { PermissionController } from "./permissions/permission-controller.ts";
+import { createUIPermissionPrompter } from "./permissions/permission-prompt.ts";
 import { expandPromptTemplate, type PromptTemplate } from "./prompt-templates.ts";
 import type { ResourceExtensionPaths, ResourceLoader } from "./resource-loader.ts";
 import { exportSessionToJsonl } from "./session-export.ts";
@@ -254,6 +256,8 @@ export interface AgentSessionConfig {
 	sessionManager: SessionManager;
 	settingsManager: SettingsManager;
 	cwd: string;
+	/** Permission gate for tool calls. Without it every tool call runs. */
+	permissionController?: PermissionController;
 	/** Models to cycle through with Ctrl+P (from --models flag) */
 	scopedModels?: Array<{ model: Model<any>; thinkingLevel?: ThinkingLevel }>;
 	/** Resource loader for extensions, skills, prompts, themes, context files, and system prompt */
@@ -379,6 +383,8 @@ export class AgentSession {
 	readonly agent: Agent;
 	readonly sessionManager: SessionManager;
 	readonly settingsManager: SettingsManager;
+	/** Permission gate for tool calls, when enabled. */
+	readonly permissions: PermissionController | undefined;
 
 	private _scopedModels: Array<{ model: Model<any>; thinkingLevel?: ThinkingLevel }>;
 
@@ -486,6 +492,7 @@ export class AgentSession {
 		this.agent = config.agent;
 		this.sessionManager = config.sessionManager;
 		this.settingsManager = config.settingsManager;
+		this.permissions = config.permissionController;
 		this._scopedModels = config.scopedModels ?? [];
 		this._resourceLoader = config.resourceLoader;
 		this._customTools = config.customTools ?? [];
@@ -650,34 +657,51 @@ export class AgentSession {
 	 * happens here instead of in wrappers.
 	 */
 	private _installAgentToolHooks(): void {
-		this.agent.beforeToolCall = (context) => this._beforeToolCall(context);
+		this.agent.beforeToolCall = (context, signal) => this._beforeToolCall(context, undefined, signal);
 		this.agent.afterToolCall = (context) => this._afterToolCall(context);
 	}
 
-	/** `tool_call` handlers. `parentToolCallId` is set for calls another tool made. */
+	/**
+	 * `tool_call` handlers, then the permission gate. Handlers run first and may block or rewrite `args` in
+	 * place; the gate then decides on the final arguments, so a rewrite cannot skip it.
+	 * `parentToolCallId` is set for calls another tool made.
+	 */
 	private async _beforeToolCall(
 		{ toolCall, args }: BeforeToolCallContext,
 		parentToolCallId?: string,
+		signal?: AbortSignal,
 	): Promise<BeforeToolCallResult | undefined> {
 		const runner = this._extensionRunner;
-		if (!runner.hasHandlers("tool_call")) {
-			return undefined;
+		if (runner.hasHandlers("tool_call")) {
+			let result: BeforeToolCallResult | undefined;
+			try {
+				result = await runner.emitToolCall({
+					type: "tool_call",
+					toolName: toolCall.name,
+					toolCallId: toolCall.id,
+					...(parentToolCallId ? { parentToolCallId } : {}),
+					input: args as Record<string, unknown>,
+				});
+			} catch (err) {
+				if (err instanceof Error) {
+					throw err;
+				}
+				throw new Error(`Extension failed, blocking execution: ${String(err)}`);
+			}
+			if (result?.block) return result;
 		}
 
-		try {
-			return await runner.emitToolCall({
-				type: "tool_call",
-				toolName: toolCall.name,
-				toolCallId: toolCall.id,
-				...(parentToolCallId ? { parentToolCallId } : {}),
-				input: args as Record<string, unknown>,
-			});
-		} catch (err) {
-			if (err instanceof Error) {
-				throw err;
-			}
-			throw new Error(`Extension failed, blocking execution: ${String(err)}`);
+		if (!this.permissions) return undefined;
+		const prompter = runner.hasUI() ? createUIPermissionPrompter(runner.getUIContext()) : undefined;
+		const check = await this.permissions.check(toolCall.name, args, prompter, signal);
+		if (!check.block) return undefined;
+		if (check.abortTurn) {
+			// The user said no without a reason: stop the run and give control back. `abort()` would wait for
+			// idle from inside the run, so only signal it here.
+			if (this._isAgentRunActive) this._agentRunAbortRequested = true;
+			this.agent.abort();
 		}
+		return { block: true, reason: check.reason };
 	}
 
 	/** `tool_result` handlers and image normalization. `parentToolCallId` is set for calls another tool made. */
@@ -749,7 +773,7 @@ export class AgentSession {
 					tools: this._getCallableTools(),
 					assistantMessage,
 					context: { messages: this.agent.state.messages, tools: this.agent.state.tools },
-					beforeToolCall: (context) => this._beforeToolCall(context, parentId),
+					beforeToolCall: (context, hookSignal) => this._beforeToolCall(context, parentId, hookSignal),
 					afterToolCall: (context) => this._afterToolCall(context, parentId),
 					signal,
 					onUpdate,

@@ -6,6 +6,7 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import chalk from "chalk";
 import { APP_NAME, CONFIG_DIR_NAME, ENV_AGENT_DIR, ENV_SESSION_DIR } from "../config.ts";
 import type { ExtensionFlag } from "../core/extensions/types.ts";
+import { PERMISSION_MODES, type PermissionMode, parsePermissionMode } from "../core/permissions/modes.ts";
 import { getToolListError, type TuiMode } from "../core/settings-manager.ts";
 
 export type Mode = "text" | "json" | "rpc";
@@ -17,6 +18,9 @@ export interface Args {
 	systemPrompt?: string;
 	appendSystemPrompt?: string[];
 	thinking?: ThinkingLevel;
+	permissionMode?: PermissionMode;
+	allowBypassPermissions?: boolean;
+	addDirs?: string[];
 	continue?: boolean;
 	resume?: boolean;
 	help?: boolean;
@@ -174,6 +178,21 @@ export function parseArgs(args: string[]): Args {
 					message: `Invalid thinking level "${level}". Valid values: ${VALID_THINKING_LEVELS.join(", ")}`,
 				});
 			}
+		} else if (arg === "--permission-mode" && i + 1 < args.length) {
+			const value = args[++i];
+			const mode = parsePermissionMode(value);
+			if (mode) {
+				result.permissionMode = mode;
+			} else {
+				result.diagnostics.push({
+					type: "error",
+					message: `Invalid permission mode "${value}". Valid values: ${PERMISSION_MODES.join(", ")} (default is an alias for manual)`,
+				});
+			}
+		} else if (arg === "--allow-bypass-permissions") {
+			result.allowBypassPermissions = true;
+		} else if (arg === "--add-dir" && i + 1 < args.length) {
+			result.addDirs = [...(result.addDirs ?? []), args[++i]];
 		} else if (arg === "--print" || arg === "-p") {
 			result.print = true;
 			const next = args[i + 1];
@@ -323,6 +342,9 @@ ${chalk.bold("Options:")}
   --exclude-tools, -xt <tools>   Comma-separated denylist of tool names or patterns (*) to disable
                                  Applies to all tools, MCP tools included
   --thinking <level>             Set thinking level: off, minimal, low, medium, high, xhigh, max
+  --permission-mode <mode>       Start in a permission mode: manual, acceptEdits, plan, auto, bypassPermissions
+  --allow-bypass-permissions     Make bypassPermissions selectable (deny rules still apply)
+  --add-dir <dir>                Treat another directory as part of the workspace (can be used multiple times)
   --extension, -e <path>         Load an extension file or builtin:<name> (can be used multiple times)
   --no-extensions, -ne           Disable extension discovery and built-in extensions (explicit -e paths still work)
   --no-mcp                       Disable built-in MCP support: no servers connect and no MCP tools
@@ -345,7 +367,7 @@ ${chalk.bold("Options:")}
   --help, -h                     Show this help
   --version, -v                  Show version number
 
-Extensions can register additional flags (e.g., --plan from plan-mode extension).${extensionFlagsText}
+Extensions can register additional flags (e.g., --preset from the preset extension).${extensionFlagsText}
 
 ${chalk.bold("Examples:")}
   # Print a provider API key for an external client

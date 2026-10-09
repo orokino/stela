@@ -3,6 +3,9 @@
  *
  * Blocks write and edit operations to protected paths.
  * Useful for preventing accidental modifications to sensitive files.
+ *
+ * Stela has built-in permission modes and allow/ask/deny rules; use those for real protection.
+ * This example shows how a `tool_call` handler can block a call; it runs before the built-in gate.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";

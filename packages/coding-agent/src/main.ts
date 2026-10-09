@@ -729,6 +729,8 @@ export async function main(args: string[], options?: MainOptions) {
 	const resolvedSkillPaths = resolveCliPaths(cwd, parsed.skills);
 	const resolvedPromptTemplatePaths = resolveCliPaths(cwd, parsed.promptTemplates);
 	const resolvedThemePaths = resolveCliPaths(cwd, parsed.themes);
+	// The permission mode survives session switches (/new, fork, resume) within one process.
+	let permissionMode = parsed.permissionMode;
 	const createRuntime: CreateAgentSessionRuntimeFactory = async ({
 		cwd,
 		agentDir,
@@ -849,7 +851,20 @@ export async function main(args: string[], options?: MainOptions) {
 			excludeTools: sessionOptions.excludeTools,
 			noTools: sessionOptions.noTools,
 			customTools: sessionOptions.customTools,
+			permissions: {
+				initialMode: permissionMode,
+				allowBypass: parsed.allowBypassPermissions,
+				additionalDirectories: parsed.addDirs,
+			},
 		});
+		const permissions = created.session.permissions;
+		if (permissions) {
+			if (permissions.startupWarning) diagnostics.push({ type: "warning", message: permissions.startupWarning });
+			permissionMode = permissions.mode;
+			permissions.onModeChange((mode) => {
+				permissionMode = mode;
+			});
+		}
 		const cliThinkingOverride = parsed.thinking !== undefined || cliThinkingFromModel;
 		if (created.session.model && cliThinkingOverride) {
 			created.session.setThinkingLevel(created.session.thinkingLevel);

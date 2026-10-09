@@ -144,6 +144,8 @@ for platform in "${PLATFORMS[@]}"; do
     cp README.md "$OUTPUT_DIR/$platform/"
     cp CHANGELOG.md "$OUTPUT_DIR/$platform/"
     cp ../../node_modules/@silvia-odwyer/photon-node/photon_rs_bg.wasm "$OUTPUT_DIR/$platform/"
+    cp ../../node_modules/web-tree-sitter/web-tree-sitter.wasm "$OUTPUT_DIR/$platform/"
+    cp src/core/permissions/tree-sitter-bash.wasm src/core/permissions/tree-sitter-bash.LICENSE "$OUTPUT_DIR/$platform/"
     mkdir -p "$OUTPUT_DIR/$platform/theme"
     cp dist/modes/interactive/theme/*.json "$OUTPUT_DIR/$platform/theme/"
     mkdir -p "$OUTPUT_DIR/$platform/assets"

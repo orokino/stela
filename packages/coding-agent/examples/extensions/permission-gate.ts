@@ -3,6 +3,9 @@
  *
  * Prompts for confirmation before running potentially dangerous bash commands.
  * Patterns checked: rm -rf, sudo, chmod/chown 777
+ *
+ * Stela has built-in permission modes and allow/ask/deny rules; use those for real protection.
+ * This example shows how a `tool_call` handler can block a call; it runs before the built-in gate.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";

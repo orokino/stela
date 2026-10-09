@@ -613,6 +613,100 @@
         }
       }
     },
+    "permissions": {
+      "type": "object",
+      "properties": {
+        "defaultMode": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "manual"
+            },
+            {
+              "type": "string",
+              "const": "default"
+            },
+            {
+              "type": "string",
+              "const": "acceptEdits"
+            },
+            {
+              "type": "string",
+              "const": "plan"
+            },
+            {
+              "type": "string",
+              "const": "auto"
+            },
+            {
+              "type": "string",
+              "const": "bypassPermissions"
+            }
+          ],
+          "description": "Permission mode at startup. \"default\" is an alias for \"manual\".",
+          "default": "manual"
+        },
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tool calls that run without asking. Rules are `Tool` or `Tool(specifier)`, for example `Bash(npm test)`, `Bash(git:*)`, `Edit(src/**)`, `WebFetch(domain:example.com)`, `mcp__github__*`."
+        },
+        "ask": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tool calls that always ask, even when a mode or allow rule would run them. Rules are `Tool` or `Tool(specifier)`, for example `Bash(npm test)`, `Bash(git:*)`, `Edit(src/**)`, `WebFetch(domain:example.com)`, `mcp__github__*`."
+        },
+        "deny": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tool calls that are always refused, in every mode. Rules are `Tool` or `Tool(specifier)`, for example `Bash(npm test)`, `Bash(git:*)`, `Edit(src/**)`, `WebFetch(domain:example.com)`, `mcp__github__*`."
+        },
+        "additionalDirectories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Directories besides the working directory that count as the workspace."
+        },
+        "allowBypass": {
+          "type": "boolean",
+          "description": "Make bypass permissions mode selectable without --allow-bypass-permissions. Read from user settings only.",
+          "default": false
+        },
+        "disableBypass": {
+          "type": "boolean",
+          "description": "Never allow bypass permissions mode.",
+          "default": false
+        },
+        "disableAuto": {
+          "type": "boolean",
+          "description": "Never allow auto mode.",
+          "default": false
+        },
+        "auto": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "description": "Classifier model for auto mode, as \"provider/modelId\"."
+            },
+            "timeoutMs": {
+              "type": "number",
+              "minimum": 1000,
+              "maximum": 120000,
+              "description": "Classifier timeout. On timeout the call asks (or is denied without a user).",
+              "default": 30000
+            }
+          }
+        }
+      }
+    },
     "sessionDir": {
       "type": "string",
       "description": "Custom session storage directory, in the same format as the --session-dir CLI flag."

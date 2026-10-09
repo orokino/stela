@@ -168,6 +168,62 @@ const CodemodeSettingsSchema = Type.Object({
 	),
 });
 
+const PermissionRuleListSchema = (description: string) =>
+	Type.Array(Type.String(), {
+		description: `${description} Rules are \`Tool\` or \`Tool(specifier)\`, for example \`Bash(npm test)\`, \`Bash(git:*)\`, \`Edit(src/**)\`, \`WebFetch(domain:example.com)\`, \`mcp__github__*\`.`,
+	});
+
+const PermissionsSettingsSchema = Type.Object({
+	defaultMode: Type.Optional(
+		Type.Union(
+			[
+				Type.Literal("manual"),
+				Type.Literal("default"),
+				Type.Literal("acceptEdits"),
+				Type.Literal("plan"),
+				Type.Literal("auto"),
+				Type.Literal("bypassPermissions"),
+			],
+			{
+				description: 'Permission mode at startup. "default" is an alias for "manual".',
+				default: SETTINGS_DEFAULTS.permissions.defaultMode,
+			},
+		),
+	),
+	allow: Type.Optional(PermissionRuleListSchema("Tool calls that run without asking.")),
+	ask: Type.Optional(
+		PermissionRuleListSchema("Tool calls that always ask, even when a mode or allow rule would run them."),
+	),
+	deny: Type.Optional(PermissionRuleListSchema("Tool calls that are always refused, in every mode.")),
+	additionalDirectories: Type.Optional(
+		Type.Array(Type.String(), {
+			description: "Directories besides the working directory that count as the workspace.",
+		}),
+	),
+	allowBypass: Type.Optional(
+		Type.Boolean({
+			description:
+				"Make bypass permissions mode selectable without --allow-bypass-permissions. Read from user settings only.",
+			default: false,
+		}),
+	),
+	disableBypass: Type.Optional(Type.Boolean({ description: "Never allow bypass permissions mode.", default: false })),
+	disableAuto: Type.Optional(Type.Boolean({ description: "Never allow auto mode.", default: false })),
+	auto: Type.Optional(
+		Type.Object({
+			model: Type.Optional(Type.String({ description: 'Classifier model for auto mode, as "provider/modelId".' })),
+			timeoutMs: Type.Optional(
+				Type.Number({
+					minimum: 1000,
+					maximum: 120000,
+					description: "Classifier timeout. On timeout the call asks (or is denied without a user).",
+					default: SETTINGS_DEFAULTS.permissions.auto.timeoutMs,
+				}),
+			),
+		}),
+	),
+});
+
 const PackageSourceSchema = Type.Union(
 	[
 		Type.String({ description: "Load all resources from the package." }),
@@ -379,6 +435,7 @@ export const SettingsSchema = Type.Object(
 		markdown: Type.Optional(MarkdownSettingsSchema),
 		warnings: Type.Optional(WarningSettingsSchema),
 		codemode: Type.Optional(CodemodeSettingsSchema),
+		permissions: Type.Optional(PermissionsSettingsSchema),
 		sessionDir: Type.Optional(
 			Type.String({
 				description: "Custom session storage directory, in the same format as the --session-dir CLI flag.",
@@ -461,6 +518,7 @@ export interface MarkdownSettings extends Static<typeof MarkdownSettingsSchema> 
 export interface WarningSettings extends Static<typeof WarningSettingsSchema> {}
 export type CodemodeMode = Static<typeof CodemodeModeSchema>;
 export interface CodemodeSettings extends Static<typeof CodemodeSettingsSchema> {}
+export interface PermissionsSettings extends Static<typeof PermissionsSettingsSchema> {}
 export type DefaultProjectTrust = NonNullable<SettingsInput["defaultProjectTrust"]>;
 export type QuietStartup = NonNullable<SettingsInput["quietStartup"]>;
 export type TransportSetting = NonNullable<SettingsInput["transport"]>;

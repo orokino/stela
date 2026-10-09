@@ -53,6 +53,12 @@ export const SETTINGS_DEFAULTS = {
 	warnings: {
 		anthropicExtraUsage: true,
 	},
+	permissions: {
+		defaultMode: "manual",
+		auto: {
+			timeoutMs: 30000,
+		},
+	},
 	codemode: {
 		mode: "on",
 		inlineBudget: 3000,

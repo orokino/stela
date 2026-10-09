@@ -496,6 +496,29 @@ export function getQuickJSWasmPath(): string {
 	return quickJSWasmPath;
 }
 
+/**
+ * Get path to the web-tree-sitter runtime wasm used by the permission shell parser.
+ * - For Bun binary: next to the executable
+ * - Otherwise: resolved from the installed `web-tree-sitter` package
+ */
+export function getTreeSitterWasmPath(): string {
+	if (isBunBinary) return join(getPackageDir(), "web-tree-sitter.wasm");
+	return createRequire(import.meta.url).resolve("web-tree-sitter/web-tree-sitter.wasm");
+}
+
+/**
+ * Get path to the vendored tree-sitter-bash grammar (v0.25.1, MIT; see tree-sitter-bash.LICENSE).
+ * - For Bun binary: next to the executable
+ * - For Node.js (dist/): dist/core/permissions/
+ * - For source (src/): src/core/permissions/
+ */
+export function getBashGrammarWasmPath(): string {
+	const packageDir = getPackageDir();
+	if (isBunBinary) return join(packageDir, "tree-sitter-bash.wasm");
+	const srcOrDist = existsSync(join(packageDir, "src")) ? "src" : "dist";
+	return join(packageDir, srcOrDist, "core", "permissions", "tree-sitter-bash.wasm");
+}
+
 /** Resolve the codemode worker entry for a release runtime. */
 export function resolveCodemodeWorkerSpecifier(
 	runtime: "bun-binary" | "bundled-node" | "unbundled",

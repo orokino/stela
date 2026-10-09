@@ -20,6 +20,10 @@ import { AgentSession, type AgentSessionEvent } from "../../src/core/agent-sessi
 import { AuthStorage } from "../../src/core/auth-storage.ts";
 import type { ExtensionRunner, ExtensionUIContext } from "../../src/core/extensions/index.ts";
 import { convertToLlm } from "../../src/core/messages.ts";
+import {
+	PermissionController,
+	type PermissionControllerOptions,
+} from "../../src/core/permissions/permission-controller.ts";
 import { SessionManager } from "../../src/core/session-manager.ts";
 import type { Settings } from "../../src/core/settings-manager.ts";
 import { SettingsManager } from "../../src/core/settings-manager.ts";
@@ -121,6 +125,8 @@ export interface HarnessOptions {
 	modelsJson?: Record<string, unknown>;
 	/** Session to continue, for example to test a resume. Default: a new in-memory session. */
 	sessionManager?: SessionManager;
+	/** Enable the permission gate; cwd is the harness temp dir and the agent dir is `<tempDir>/agent`. */
+	permissions?: Omit<PermissionControllerOptions, "cwd" | "agentDir" | "settingsManager">;
 }
 
 export interface Harness {
@@ -241,6 +247,14 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
 		allowedToolNames: options.allowedToolNames,
 		excludedToolNames: options.excludedToolNames,
 		extensionRunnerRef,
+		permissionController: options.permissions
+			? new PermissionController({
+					...options.permissions,
+					cwd: tempDir,
+					agentDir: join(tempDir, "agent"),
+					settingsManager,
+				})
+			: undefined,
 	});
 
 	const events: AgentSessionEvent[] = [];

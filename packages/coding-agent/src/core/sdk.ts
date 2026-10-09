@@ -13,6 +13,7 @@ import { createToolNameMatcher } from "./mcp-servers.ts";
 import { convertToLlm } from "./messages.ts";
 import { findInitialModel } from "./model-resolver.ts";
 import { ModelRuntime } from "./model-runtime.ts";
+import { PermissionController, type PermissionControllerOptions } from "./permissions/permission-controller.ts";
 import { mergeProviderAttributionHeaders } from "./provider-attribution.ts";
 import type { ResourceLoader } from "./resource-loader.ts";
 import { DefaultResourceLoader } from "./resource-loader.ts";
@@ -103,6 +104,14 @@ export interface CreateAgentSessionOptions {
 	settingsManager?: SettingsManager;
 	/** Session start event metadata for extension runtime startup. */
 	sessionStartEvent?: SessionStartEvent;
+	/**
+	 * Gate tool calls with permission modes and allow/ask/deny rules. The Stela CLI always sets this; without it,
+	 * every tool call runs, as before.
+	 */
+	permissions?: Pick<
+		PermissionControllerOptions,
+		"initialMode" | "allowBypass" | "additionalDirectories" | "analyzeShell"
+	>;
 }
 
 /** Result from createAgentSession */
@@ -475,6 +484,9 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		excludedToolNames,
 		extensionRunnerRef,
 		sessionStartEvent: options.sessionStartEvent,
+		permissionController: options.permissions
+			? new PermissionController({ ...options.permissions, cwd, agentDir, settingsManager })
+			: undefined,
 	});
 
 	const extensionsResult = resourceLoader.getExtensions();
