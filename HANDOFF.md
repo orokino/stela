@@ -190,9 +190,12 @@ The approved plan, with phase details, decision ledger and implementation outlin
     fail-to-ask (deny headless), timeout clamp 1–120 s, 3/20 denial breaker.
   - `9d993606b`: `ctx.permissions.getMode()/setMode()` and the `permission_mode_change` event.
   - Tests: 74 across the five permission test files. `npm run check` is clean.
-- Not verified live: the `exit_plan_mode` dialog and auto mode in the TUI (only through the faux-provider suite).
-- Next: step 7 (docs, RPC smoke test, tmux check of plan handoff, build verification). `npm run build` needs the
-  user's go-ahead. Small follow-ups are under "Remaining" in `PLAN.md`.
+- Step 7 (`f97e647ca`): `docs/permissions.md` and `test/rpc-permissions.test.ts`. `npm run build:offline` passed;
+  the bundled CLI (checkout and an `npm pack` copy) loads both wasm files; an RPC smoke run and a tmux TUI run of the
+  bundled CLI with a scripted local provider extension covered plan handoff, bash approval and auto mode.
+- Not verified: the Bun binary wasm paths (`build:binary`); Bun is not installed.
+- Next: the small follow-ups under "Remaining" in `PLAN.md` (program-status "permission" blocked kind, editable rule in
+  the dialog, stale `.pi` strings in MCP messages and docs), and the Bun binary check where Bun is available.
 
 **Operational lessons (see also Claude memory `rea-reliability`):**
 - **Load:**
@@ -219,7 +222,5 @@ The approved plan, with phase details, decision ledger and implementation outlin
 Suggested opening prompt (permission modes, in progress):
 
 > Stela. Read HANDOFF.md "Current work — permission modes" and the "Remaining" list in
-> docs/research/permissions/PLAN.md. Steps 1–6 and the D14 extension API are committed. Do step 7:
-> docs/permissions.md, an RPC approval smoke test, a tmux check of the exit_plan_mode handoff and auto
-> mode, then the build verification of the wasm paths. Ask me before running npm run build.
-> Do not overload the machine.
+> docs/research/permissions/PLAN.md. Permission modes steps 1–7 are committed. Do the small follow-ups
+> listed there, each with tests and npm run check, and commit each. Do not overload the machine.
