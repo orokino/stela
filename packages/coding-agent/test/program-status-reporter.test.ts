@@ -2,7 +2,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ProgramStatus, Terminal } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 import type { AgentSessionEvent } from "../src/core/agent-session.ts";
-import { ProgramStatusReporter } from "../src/modes/interactive/program-status-reporter.ts";
+import { dialogBlockedStatus, ProgramStatusReporter } from "../src/modes/interactive/program-status-reporter.ts";
 
 function setup(sessionName?: string) {
 	const reports: ProgramStatus[] = [];
@@ -134,6 +134,15 @@ describe("ProgramStatusReporter", () => {
 		expect(last()).toEqual({ state: "blocked", kind: "question", message: "Pick one" });
 		reporter.setBlocked("extension-selector", undefined);
 		expect(last()).toEqual({ state: "done" });
+	});
+
+	it("reports permission dialogs by their first title line only", () => {
+		const title = "Allow bash?\nrm -rf build\nNo permission rule allows this call.";
+		expect(dialogBlockedStatus(title, { kind: "permission" })).toEqual({
+			kind: "permission",
+			message: "Allow bash?",
+		});
+		expect(dialogBlockedStatus("Pick one", undefined)).toEqual({ kind: "question", message: "Pick one" });
 	});
 
 	it("sends each status once and follows session name changes", () => {

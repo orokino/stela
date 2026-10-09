@@ -117,6 +117,11 @@ export interface ExtensionUIDialogOptions {
 	signal?: AbortSignal;
 	/** Timeout in milliseconds. Dialog auto-dismisses with live countdown display. */
 	timeout?: number;
+	/**
+	 * What the dialog asks for, reported to terminals as the program status `blocked` kind. Defaults to `question`.
+	 * A `permission` dialog reports only the first line of its title, so details such as a command stay private.
+	 */
+	kind?: "question" | "permission";
 }
 
 /** Placement for extension widgets. */

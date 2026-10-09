@@ -22,7 +22,7 @@ export function createUIPermissionPrompter(ui: Pick<ExtensionUIContext, "select"
 		if (prompt.canAcceptEdits) options.push(ACCEPT_EDITS);
 		options.push(NO_FEEDBACK, NO);
 
-		const choice = await ui.select(lines.join("\n"), options, { signal });
+		const choice = await ui.select(lines.join("\n"), options, { signal, kind: "permission" });
 		switch (choice) {
 			case YES:
 				return { kind: "once" };
@@ -33,7 +33,9 @@ export function createUIPermissionPrompter(ui: Pick<ExtensionUIContext, "select"
 			case ACCEPT_EDITS:
 				return { kind: "acceptEdits" };
 			case NO_FEEDBACK: {
-				const feedback = (await ui.input("Tell the model why", "what to do instead", { signal }))?.trim();
+				const feedback = (
+					await ui.input("Tell the model why", "what to do instead", { signal, kind: "permission" })
+				)?.trim();
 				return { kind: "deny", feedback: feedback || undefined };
 			}
 			case NO:

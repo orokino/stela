@@ -225,7 +225,7 @@ Pi reports its state with the [Program Status Protocol (OSC 7501)](https://www.s
 | State | When |
 |---|---|
 | `working` | An agent run or compaction is in progress. The message is the session name. |
-| `blocked` | An extension dialog or login waits for you. The message is the dialog title. |
+| `blocked` | A dialog or login waits for you. The kind is `permission` for tool approvals and `confirm()` dialogs, `auth` for login, and `question` otherwise. The message is the dialog title; a tool approval reports only its first line, such as `Allow bash?`. |
 | `done` | A run finished. The message is the session name. |
 | `error` | A run ended with an error that is not retried. The message is the first line of the error. |
 | `idle` | Pi started, or you cancelled the run. |

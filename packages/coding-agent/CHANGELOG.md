@@ -15,6 +15,7 @@
 - Added `--permission-mode`, `--allow-bypass-permissions`, and `--add-dir`, the `/permissions` picker, `/plan`, and the permission mode at the start of the footer.
 - Added the `exit_plan_mode` tool, declared only in plan mode: the model submits its plan and the user implements it in accept edits, manual, or auto, or keeps planning with feedback. Plan mode may write a plan draft to `~/.stela/agent/plans/<session-id>.md`.
 - Added the auto mode classifier: calls that the rules and accept-edits scope leave open go to the model in `permissions.auto.model`, which allows or denies them. An uncertain verdict, error, or timeout (`permissions.auto.timeoutMs`, default 30 s, clamped to 1-120 s) asks the user, or denies when no one can approve. After 3 consecutive or 20 total classifier denials, auto mode asks for the rest of the session.
+- Added the `kind` option to extension `select()` and `input()` dialogs. `kind: "permission"` reports the dialog to the terminal as a permission prompt (OSC 7501) with only the first line of its title; the tool approval dialog uses it.
 - Added `ctx.permissions` (`getMode()`, `setMode()`) and the `permission_mode_change` event for extensions. `ctx.permissions` is undefined when the session has no permission gate. Extensions cannot change rules or grants; `tool_call` handlers still run before the gate, which checks the final arguments.
 - Added a Node-based checkout launcher and non-overwriting per-user installer for `stela`; existing global `pi` installations remain separate.
 

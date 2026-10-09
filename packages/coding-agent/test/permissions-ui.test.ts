@@ -1,8 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { AgentSession } from "../src/core/agent-session.ts";
+import type { ExtensionUIDialogOptions } from "../src/core/extensions/types.ts";
 import type { ReadonlyFooterDataProvider } from "../src/core/footer-data-provider.ts";
 import { KEYBINDINGS } from "../src/core/keybindings.ts";
 import type { PermissionMode } from "../src/core/permissions/modes.ts";
+import { createUIPermissionPrompter } from "../src/core/permissions/permission-prompt.ts";
 import { FooterComponent } from "../src/modes/interactive/components/footer.ts";
 import { PermissionModeSelectorComponent } from "../src/modes/interactive/components/permission-mode-selector.ts";
 import { initTheme } from "../src/modes/interactive/theme/theme.ts";
@@ -66,5 +68,29 @@ describe("permission modes UI", () => {
 		expect(text).toContain("unavailable: set permissions.auto.model");
 		selector.handleInput("\r");
 		expect(selected).toEqual(["plan"]);
+	});
+
+	it("marks the approval dialog and its feedback input as permission dialogs", async () => {
+		const kinds: Array<ExtensionUIDialogOptions["kind"]> = [];
+		const prompter = createUIPermissionPrompter({
+			select: async (_title, _options, opts) => {
+				kinds.push(opts?.kind);
+				return "No, and tell the model why";
+			},
+			input: async (_title, _placeholder, opts) => {
+				kinds.push(opts?.kind);
+				return "use git status";
+			},
+		});
+		const answer = await prompter({
+			toolName: "bash",
+			summary: "git push",
+			reason: "No permission rule allows this call.",
+			suggestedRules: ["Bash(git push)"],
+			canSaveToProject: false,
+			canAcceptEdits: false,
+		});
+		expect(answer).toEqual({ kind: "deny", feedback: "use git status" });
+		expect(kinds).toEqual(["permission", "permission"]);
 	});
 });

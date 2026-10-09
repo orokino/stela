@@ -1,8 +1,15 @@
 import type { ProgramStatus, Terminal } from "@earendil-works/pi-tui";
 import { APP_NAME } from "../../config.ts";
 import type { AgentSessionEvent } from "../../core/agent-session.ts";
+import type { ExtensionUIDialogOptions } from "../../core/extensions/types.ts";
 
 export type BlockedStatus = { kind: NonNullable<ProgramStatus["kind"]>; message: string };
+
+/** Status for an open select or input dialog. A permission dialog reports only its first title line ("Allow bash?"). */
+export function dialogBlockedStatus(title: string, opts: ExtensionUIDialogOptions | undefined): BlockedStatus {
+	if (opts?.kind === "permission") return { kind: "permission", message: title.split("\n", 1)[0] };
+	return { kind: "question", message: title };
+}
 
 function firstLine(text: string | undefined): string {
 	return text?.split(/\r?\n/, 1)[0]?.trim() || "Error";
