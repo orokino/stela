@@ -193,8 +193,15 @@ The approved plan, with phase details, decision ledger and implementation outlin
 - `./test.sh` has failures that are not from this work: `fd` tests offline, tests still expecting pi names after the
   Stela cutover, unbuilt artifacts (pi-ai entry, chord, env daemon), a flaky `auth-storage` test, and 4 pi-ai
   model-metadata tests.
-- Next: the follow-ups in `PLAN.md` "Remaining" item 5. The first is a decision for the user (plan mode protected
-  reads: ask vs deny). Then the dangerous-command exact-only grant, which the plan specified but was not built.
+- Follow-ups 5.1–5.6 of `PLAN.md` "Remaining" are done (2026-10-09), one commit each: `0228b8f75` plan mode denies
+  protected paths (user: deny); `e33591165` dangerous-command risk list, allowed only by an exact rule (user: enforce
+  at rule matching); `9f7639edb` approval dialog reported as OSC 7501 `kind=permission` with only its first title
+  line; `1e9646ff1` "Save which rule?" picker to widen a grant (user: picker, no free text); `1a8f50090` `.pi` paths
+  in MCP messages and docs; `6bb6773e4` only the built-in `exit_plan_mode` skips the gate (user: identity check).
+- Live checks run from source with `./stela` (no build needed): print/json, tmux TUI (`pipe-pane` captures OSC 7501),
+  and `rpc-smoke.mjs` with `./stela` as the CLI path.
+- Next: 5.7, the Bun binary wasm check; needs the user's go-ahead to install Bun and run `npm run build:binary`.
+  Still open from 5.5: "Pi"/`pi` in doc prose and command examples, and `examples/` READMEs with `~/.pi` paths.
 
 **Operational lessons (see also Claude memory `rea-reliability`):**
 - **Load:**
