@@ -33,24 +33,38 @@ Plain Docker provides the simplest whole-process container boundary.
 
 ### Build the image
 
-Create `Dockerfile.pi`:
+Create `Dockerfile.stela` in the repository root. Stela runs from a source checkout; see the [Quickstart](quickstart.md#1-install-stela) and the repository's [checkout setup](../../../README.md#run-stela-from-this-checkout).
 
 ```dockerfile
-FROM node:24-bookworm-slim
+FROM node:22.19-bookworm-slim
+
+ARG STELA_REF=main
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates git ripgrep \
+  && apt-get install -y --no-install-recommends bash ca-certificates curl git ripgrep \
   && rm -rf /var/lib/apt/lists/*
-RUN npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+
+RUN git clone --depth 1 --branch "$STELA_REF" https://github.com/orokino/stela.git /stela
+
+WORKDIR /stela
+
+RUN npm ci --ignore-scripts --no-audit --no-fund \
+  && mkdir -p .artifacts/stela-bootstrap \
+  && curl -fL 'https://pi.dev/api/models/revisions/sha256-439c53478c84ed27a58f8b54e1c3bd45810e5a969515b4e3666a3898d51ee22f?types=chat,image,classifier' \
+    -o .artifacts/stela-bootstrap/models.all.json \
+  && printf '%s  %s\n' '439c53478c84ed27a58f8b54e1c3bd45810e5a969515b4e3666a3898d51ee22f' \
+    '.artifacts/stela-bootstrap/models.all.json' | sha256sum -c - \
+  && node packages/ai/scripts/hydrate-model-catalog.ts .artifacts/stela-bootstrap/models.all.json \
+  && npm run check:model-data
 
 WORKDIR /workspace
-ENTRYPOINT ["stela"]
+ENTRYPOINT ["node", "/stela/stela"]
 ```
 
-Build it from the directory containing the file:
+Build it from the repository root. The default build clones `main`; set `STELA_REF` to another branch when needed.
 
 ```bash
-docker build -t stela-sandbox -f Dockerfile.pi .
+docker build -f Dockerfile.stela -t stela-sandbox .
 ```
 
 ### Start Stela

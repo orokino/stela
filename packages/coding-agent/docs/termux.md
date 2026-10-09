@@ -16,25 +16,48 @@ Install Termux from [GitHub or F-Droid](https://github.com/termux/termux-app#ins
    pkg update && pkg upgrade
    ```
 
-2. Install Node.js and Git:
+2. Install Node.js and the tools used by the checkout setup:
 
    ```bash
-   pkg install nodejs git
+   pkg install nodejs git curl coreutils
    ```
 
-3. Install Stela:
+   Stela requires Node.js 22.19 or newer. Confirm the version before continuing:
 
    ```bash
-   npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+   node --version
    ```
 
-4. Verify the installation:
+3. Clone Stela and enter the checkout:
 
    ```bash
+   git clone https://github.com/orokino/stela.git "$HOME/stela"
+   cd "$HOME/stela"
+   ```
+
+   Keep this checkout in place; the installed command links to it. The bootstrap below follows the [verified checkout setup](../../../HANDOFF.md#verified-checkout-setup), though Termux-specific compatibility has not been verified.
+
+4. Install checkout dependencies and hydrate model data:
+
+   ```bash
+   npm ci --ignore-scripts --no-audit --no-fund
+   mkdir -p .artifacts/stela-bootstrap
+   curl -fL 'https://pi.dev/api/models/revisions/sha256-439c53478c84ed27a58f8b54e1c3bd45810e5a969515b4e3666a3898d51ee22f?types=chat,image,classifier' \
+     -o .artifacts/stela-bootstrap/models.all.json
+   printf '%s  %s\n' '439c53478c84ed27a58f8b54e1c3bd45810e5a969515b4e3666a3898d51ee22f' \
+     '.artifacts/stela-bootstrap/models.all.json' | sha256sum -c -
+   node packages/ai/scripts/hydrate-model-catalog.ts .artifacts/stela-bootstrap/models.all.json
+   npm run check:model-data
+   ```
+
+5. Link the checkout launcher into Termux's command directory and verify it:
+
+   ```bash
+   node scripts/install-stela.mjs --bin-dir "$PREFIX/bin"
    stela --version
    ```
 
-5. Open the folder you want to work in and start Stela:
+6. Open the folder you want to work in and start Stela:
 
    ```bash
    cd /path/to/working-folder
@@ -107,11 +130,12 @@ Run `termux-setup-storage`, approve the Android permission request, and retry th
 
 ### Stela is not found after installation
 
-Open a new Termux shell and run:
+Check that the installer created the link and that Termux's command directory is on `PATH`:
 
 ```bash
-npm prefix -g
+ls -l "$PREFIX/bin/stela"
+printf '%s\n' "$PATH"
 command -v stela
 ```
 
-Confirm that the global npm binary directory is on `PATH`, then reinstall Stela if the package is missing.
+The link should point into the checkout, and `$PREFIX/bin` should appear in `PATH`. If the link is missing, run the installer again from the checkout. It refuses to replace an unrelated existing command; resolve that path conflict before retrying.
