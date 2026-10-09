@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Api, AssistantMessage, Model } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { type ClassifierModelRuntime, createModelPermissionClassifier } from "../src/core/permissions/auto-decider.ts";
 import { decidePermission, type GateContext, type ShellAnalyzer } from "../src/core/permissions/gate.ts";
 import {
 	getModeUnavailableReason,
@@ -325,5 +327,58 @@ describe("permission gate", () => {
 			action: "ask",
 			suggestedRules: ["WebFetch(domain:evil.test)"],
 		});
+	});
+});
+
+describe("permission classifier", () => {
+	const request = {
+		toolName: "bash",
+		args: { command: "mkdir -p build" },
+		cwd: "/tmp",
+		userIntent: "prepare a build directory",
+		reason: "No permission rule allows this call.",
+	};
+	const model = { id: "m", provider: "p" } as unknown as Model<Api>;
+	const reply = {
+		stopReason: "stop",
+		content: [{ type: "text", text: '{"decision":"allow","reason":"routine"}' }],
+	} as unknown as AssistantMessage;
+
+	function classifierWith(sessionIds: Array<string | undefined>, sessionId?: string) {
+		const runtime: ClassifierModelRuntime = {
+			getModel: () => model,
+			completeSimple: async (_model, _context, options) => {
+				sessionIds.push(options?.sessionId);
+				return reply;
+			},
+		};
+		return createModelPermissionClassifier(runtime, sessionId === undefined ? undefined : { sessionId });
+	}
+
+	test("sends the session id with the classifier call", async () => {
+		const seen: Array<string | undefined> = [];
+		const classify = classifierWith(seen, "session-1");
+		const verdict = await classify(request, { model: "p/m", signal: new AbortController().signal });
+		expect(verdict).toEqual({ decision: "allow", reason: "routine" });
+		expect(seen).toEqual(["session-1"]);
+	});
+
+	test("generates a routing session id when none is given", async () => {
+		const seen: Array<string | undefined> = [];
+		const classify = classifierWith(seen);
+		await classify(request, { model: "p/m", signal: new AbortController().signal });
+		await classify(request, { model: "p/m", signal: new AbortController().signal });
+		expect(seen[0]).toEqual(expect.any(String));
+		expect(seen[0]).not.toBe("");
+		// Stable per classifier, so related calls keep one routing id.
+		expect(seen[1]).toBe(seen[0]);
+	});
+
+	test("replaces an empty session id", async () => {
+		const seen: Array<string | undefined> = [];
+		const classify = classifierWith(seen, "");
+		await classify(request, { model: "p/m", signal: new AbortController().signal });
+		expect(seen[0]).toEqual(expect.any(String));
+		expect(seen[0]).not.toBe("");
 	});
 });

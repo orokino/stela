@@ -1,4 +1,4 @@
-import type { Api, AssistantMessage, Context, Model } from "@earendil-works/pi-ai";
+import { type Api, type AssistantMessage, type Context, type Model, uuidv7 } from "@earendil-works/pi-ai";
 
 /** What the classifier sees: the call, where it runs, and what the user asked for. Never the full transcript. */
 export interface ClassifierRequest {
@@ -144,11 +144,26 @@ Reply with only a JSON object: {"decision": "allow" | "deny" | "uncertain", "rea
 /** What the classifier model call needs from the model runtime. */
 export interface ClassifierModelRuntime {
 	getModel(provider: string, modelId: string): Model<Api> | undefined;
-	completeSimple(model: Model<Api>, context: Context, options?: { signal?: AbortSignal }): Promise<AssistantMessage>;
+	completeSimple(
+		model: Model<Api>,
+		context: Context,
+		options?: { signal?: AbortSignal; sessionId?: string },
+	): Promise<AssistantMessage>;
+}
+
+/** Options for {@link createModelPermissionClassifier}. */
+export interface ModelPermissionClassifierOptions {
+	/** Routing session id sent with the classifier call; a fresh id is generated when omitted. */
+	sessionId?: string;
 }
 
 /** A classifier backed by one model call. The model must return the JSON verdict described in the system prompt. */
-export function createModelPermissionClassifier(runtime: ClassifierModelRuntime): PermissionClassifier {
+export function createModelPermissionClassifier(
+	runtime: ClassifierModelRuntime,
+	options?: ModelPermissionClassifierOptions,
+): PermissionClassifier {
+	// Providers such as OpenCode Go require a session id to route the request; without one the call is rejected.
+	const sessionId = options?.sessionId || uuidv7();
 	return async (request, { model: modelRef, signal }) => {
 		const slash = modelRef.indexOf("/");
 		const model = slash > 0 ? runtime.getModel(modelRef.slice(0, slash), modelRef.slice(slash + 1)) : undefined;
@@ -164,7 +179,7 @@ export function createModelPermissionClassifier(runtime: ClassifierModelRuntime)
 				systemPrompt: CLASSIFIER_SYSTEM_PROMPT,
 				messages: [{ role: "user", content: [{ type: "text", text }], timestamp: Date.now() }],
 			},
-			{ signal },
+			{ signal, sessionId },
 		);
 		if (response.stopReason === "error" || response.stopReason === "aborted") {
 			throw new Error(response.errorMessage ?? `request ${response.stopReason}`);

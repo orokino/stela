@@ -492,7 +492,9 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 					agentDir,
 					settingsManager,
 					planFilePath: join(agentDir, "plans", `${sessionManager.getSessionId()}.md`),
-					classifier: createModelPermissionClassifier(modelRuntime),
+					classifier: createModelPermissionClassifier(modelRuntime, {
+						sessionId: sessionManager.getSessionId(),
+					}),
 				})
 			: undefined,
 	});
