@@ -56,7 +56,7 @@ export type PermissionDecision =
 /**
  * Decide one tool call. Order:
  * 1. deny rules (any target) deny, in every mode;
- * 2. plan mode denies writes and non-read-only shell;
+ * 2. plan mode denies writes, non-read-only shell and protected paths;
  * 3. protected paths ask (not in bypass);
  * 4. ask rules ask (bypass allows);
  * 5. bypass allows;
@@ -117,6 +117,12 @@ export function decidePermission(tool: string, args: unknown, ctx: GateContext):
 
 	if (ctx.mode !== "bypassPermissions") {
 		const protectedPath = findProtectedPath(targets, ctx.agentDir, ctx.planFilePath);
+		if (protectedPath && ctx.mode === "plan") {
+			return {
+				action: "deny",
+				reason: `Plan mode does not access protected paths: ${displayPath(protectedPath, realCwd)}. ${PLAN_MODE_SUFFIX}`,
+			};
+		}
 		if (protectedPath) {
 			return {
 				action: "ask",
@@ -161,6 +167,8 @@ export function decidePermission(tool: string, args: unknown, ctx: GateContext):
 	};
 }
 
+const PLAN_MODE_SUFFIX = "Investigate and present the plan instead; the user decides when to leave plan mode.";
+
 function planModeDenial(
 	targets: readonly PermissionTarget[],
 	readOnlySegments: ReadonlySet<PermissionTarget>,
@@ -169,7 +177,7 @@ function planModeDenial(
 	realCwd: string,
 ): string | undefined {
 	const prefix = "Plan mode is read-only:";
-	const suffix = "Investigate and present the plan instead; the user decides when to leave plan mode.";
+	const suffix = PLAN_MODE_SUFFIX;
 	if (opaqueReason !== undefined) {
 		return `${prefix} shell commands that cannot be analyzed are not allowed (${opaqueReason}). ${suffix}`;
 	}

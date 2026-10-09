@@ -28,7 +28,7 @@ Switch modes with:
 The gate applies these steps in order. The first one that decides wins.
 
 1. A matching `deny` rule denies the call, in every mode.
-2. In plan mode, an edit (other than the plan file) or a shell command that is not read-only is denied.
+2. In plan mode, an edit (other than the plan file), a shell command that is not read-only, or a call that touches a protected path is denied.
 3. A call that touches a protected path asks, except in bypass.
 4. A matching `ask` rule asks, except in bypass.
 5. Bypass allows the call.
@@ -104,7 +104,7 @@ Some paths are protected even inside the workspace:
 - Credentials, which ask for both reads and writes: `.ssh/`, `.env` and `.env.*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, and private keys named `id_*`.
 - Configuration, which asks for writes: `.git/`, `.stela/`, `~/.stela/agent/`, `.vscode/`, `.idea/`, and shell startup files such as `.bashrc` and `.zshrc`.
 
-Protected paths ask in every mode except bypass, where they are not checked. In plan mode, writes to them are denied like every other write.
+Protected paths ask in every mode except plan and bypass. Plan mode denies them, including credential reads such as `cat .env`; bypass does not check them.
 
 ## Approval dialog
 

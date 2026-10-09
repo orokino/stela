@@ -205,6 +205,15 @@ describe("permission gate", () => {
 		);
 	});
 
+	test("plan: denies protected reads instead of asking", () => {
+		expect(decide("read", { path: ".env" }, { mode: "plan" })).toMatchObject({
+			action: "deny",
+			reason: expect.stringContaining("Plan mode does not access protected paths: .env."),
+		});
+		expect(decide("read", { path: ".env" }, { mode: "manual" }).action).toBe("ask");
+		expect(decide("read", { path: ".git/config" }, { mode: "plan" }).action).toBe("allow");
+	});
+
 	test("bypass: no prompts, but deny rules still block", () => {
 		const denyRm = rules({ deny: ["Bash(rm:*)"] });
 		expect(decide("bash", { command: "npm test" }, { mode: "bypassPermissions" }).action).toBe("allow");
