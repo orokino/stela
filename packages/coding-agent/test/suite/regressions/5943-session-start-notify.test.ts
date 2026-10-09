@@ -39,6 +39,8 @@ type LoadedResourcesContext = {
 };
 
 type RebindContext = {
+	/** A session without a permission gate, so the footer mode subscription is skipped. */
+	session: { permissions: undefined };
 	unsubscribe?: () => void;
 	applyRuntimeSettings: () => void;
 	programStatus: { reset(): void };
@@ -252,6 +254,7 @@ describe("regression #5943: session_start transient UI", () => {
 
 		try {
 			const context: RebindContext = {
+				session: { permissions: undefined },
 				applyRuntimeSettings: () => events.push("apply"),
 				programStatus: { reset: () => {} },
 				renderCurrentSessionState: () => events.push("render"),
@@ -294,6 +297,7 @@ describe("regression #5943: session_start transient UI", () => {
 
 		try {
 			const context: RebindContext = {
+				session: { permissions: undefined },
 				applyRuntimeSettings: () => {},
 				programStatus: { reset: () => {} },
 				renderCurrentSessionState: () => events.push("render"),
@@ -347,6 +351,7 @@ describe("regression #5943: session_start transient UI", () => {
 
 		try {
 			const context: RebindContext = {
+				session: { permissions: undefined },
 				applyRuntimeSettings: () => {},
 				programStatus: { reset: () => {} },
 				renderCurrentSessionState: () => events.push("render"),
