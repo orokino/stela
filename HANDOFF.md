@@ -169,33 +169,32 @@ The approved plan, with phase details, decision ledger and implementation outlin
 
 **Phase 2 is done:** `docs/research/permissions/DECISIONS.md` has the follow-ups folded in, and no pick changed.
 
-**Implementation: steps 1–4 of `docs/research/permissions/PLAN.md` are committed (2026-10-09).**
-- `4799266e8`: the gate, rules, workspace scope and protected paths, the tree-sitter bash analyzer, the
-  `PermissionController`, the approval dialog, `permissions.*` settings, and the flags `--permission-mode`,
-  `--allow-bypass-permissions` and `--add-dir`. The `plan-mode` example extension was removed.
-- `72e2111fc`: Shift+Tab mode cycle (thinking moved to Alt+T), the `/permissions` picker, `/plan`, and the footer
-  mode indicator.
+**Implementation: steps 1–7 of `docs/research/permissions/PLAN.md` are done and pushed (2026-10-09).**
+- Commits:
+  - `4799266e8`: gate, rules, workspace scope and protected paths, tree-sitter bash analyzer, `PermissionController`,
+    approval dialog, `permissions.*` settings, flags `--permission-mode`, `--allow-bypass-permissions`, `--add-dir`.
+    The `plan-mode` example extension was removed.
+  - `72e2111fc`: Shift+Tab mode cycle (thinking moved to Alt+T), `/permissions` picker, `/plan`, footer indicator.
+  - `95d0f3f36`: `exit_plan_mode` (declared only in plan mode; implement in accept edits / manual / auto, or keep
+    planning) and the plan file `<agentDir>/plans/<session-id>.md`.
+  - `acbfc22bd`: auto mode classifier (`core/permissions/auto-decider.ts`): one call to `permissions.auto.model`,
+    fail-to-ask (deny headless), timeout clamp 1–120 s, 3 consecutive / 20 total denial breaker.
+  - `9d993606b`: extension API `ctx.permissions.getMode()/setMode()` and the `permission_mode_change` event.
+  - `f97e647ca`: `packages/coding-agent/docs/permissions.md` (user docs) and `test/rpc-permissions.test.ts`.
 - Code: `packages/coding-agent/src/core/permissions/`. The gate is an SDK option (`createAgentSession({ permissions })`);
   the Stela CLI always enables it, and SDK callers without it behave as before.
-- Tests: `test/permissions-{core,bash,ui}.test.ts` and `test/suite/agent-session-permissions.test.ts`, 52 in total.
-  A live tmux run with a scripted faux provider passed. `npm run check` is clean.
+- Tests: 76 in `test/permissions-{core,bash,ui}.test.ts`, `test/suite/agent-session-{permissions,auto-mode}.test.ts`
+  and `test/rpc-permissions.test.ts`. `npm run check` is clean.
+- Verified live with the bundled CLI (`npm run build:offline`; same as `build` minus the network model regeneration):
+  both wasm files load from the checkout and from an `npm pack` copy; an RPC run and a tmux TUI run covered plan
+  handoff, bash approval and auto mode (allow, deny, uncertain, Esc). Tools and how to rerun them:
+  `docs/research/permissions/smoke/README.md` (git-ignored).
+- Not verified: Bun binary wasm paths (`build:binary`); Bun is not installed.
 - `./test.sh` has failures that are not from this work: `fd` tests offline, tests still expecting pi names after the
   Stela cutover, unbuilt artifacts (pi-ai entry, chord, env daemon), a flaky `auth-storage` test, and 4 pi-ai
   model-metadata tests.
-- Not verified: the npm bundle and Bun binary wasm paths (`npm run build` was not run).
-- Steps 5, 6 and the D14 extension API are committed (2026-10-09):
-  - `95d0f3f36`: `exit_plan_mode` (declared only in plan mode; implement in accept edits / manual / auto, or keep
-    planning) and the plan file `<agentDir>/plans/<session-id>.md`.
-  - `acbfc22bd`: auto mode classifier (`core/permissions/auto-decider.ts`): model call to `permissions.auto.model`,
-    fail-to-ask (deny headless), timeout clamp 1–120 s, 3/20 denial breaker.
-  - `9d993606b`: `ctx.permissions.getMode()/setMode()` and the `permission_mode_change` event.
-  - Tests: 74 across the five permission test files. `npm run check` is clean.
-- Step 7 (`f97e647ca`): `docs/permissions.md` and `test/rpc-permissions.test.ts`. `npm run build:offline` passed;
-  the bundled CLI (checkout and an `npm pack` copy) loads both wasm files; an RPC smoke run and a tmux TUI run of the
-  bundled CLI with a scripted local provider extension covered plan handoff, bash approval and auto mode.
-- Not verified: the Bun binary wasm paths (`build:binary`); Bun is not installed.
-- Next: the small follow-ups under "Remaining" in `PLAN.md` (program-status "permission" blocked kind, editable rule in
-  the dialog, stale `.pi` strings in MCP messages and docs), and the Bun binary check where Bun is available.
+- Next: the follow-ups in `PLAN.md` "Remaining" item 5. The first is a decision for the user (plan mode protected
+  reads: ask vs deny). Then the dangerous-command exact-only grant, which the plan specified but was not built.
 
 **Operational lessons (see also Claude memory `rea-reliability`):**
 - **Load:**
@@ -219,8 +218,11 @@ The approved plan, with phase details, decision ledger and implementation outlin
    the actual CLI/TUI path. Apply the frozen visual tokens when UI work begins. No automatic prototype
    port, recovered prompt import, extension inlining, GUI launch, or SQLite migration.
 
-Suggested opening prompt (permission modes, in progress):
+Suggested opening prompt (permission modes, follow-ups):
 
-> Stela. Read HANDOFF.md "Current work — permission modes" and the "Remaining" list in
-> docs/research/permissions/PLAN.md. Permission modes steps 1–7 are committed. Do the small follow-ups
-> listed there, each with tests and npm run check, and commit each. Do not overload the machine.
+> Stela. Read HANDOFF.md "Current work — permission modes" and item 5 of "Remaining" in
+> docs/research/permissions/PLAN.md. Permission modes steps 1–7 are committed and pushed. First ask me
+> the plan-mode protected-read decision (5.1). Then do 5.2–5.6 in order, each with tests and
+> npm run check, committed separately; verify UI changes live with the smoke tools in
+> docs/research/permissions/smoke/. Ask me before any build or before installing Bun (5.7).
+> Do not overload the machine.
