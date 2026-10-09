@@ -1,8 +1,8 @@
 # Slash commands
 
-Type `/` in Pi's terminal editor to search the commands available in the current session. This page lists the built-in commands in the current Pi release.
+Type `/` in Stela's terminal editor to search the commands available in the current session. This page lists the built-in commands in the current Stela release.
 
-Extensions, prompt templates, and skills can add commands. The command menu in Pi is therefore the exact reference for the resources loaded in your session.
+Extensions, prompt templates, and skills can add commands. The command menu in Stela is therefore the exact reference for the resources loaded in your session.
 
 ## Models and settings
 
@@ -45,11 +45,11 @@ Review a session before exporting or sharing it. Sessions can contain prompts, t
 
 | Command | Description |
 |---|---|
-| `/trust` | Save a project trust decision for future Pi processes |
+| `/trust` | Save a project trust decision for future Stela processes |
 | `/reload` | Reload keybindings, extensions, skills, templates, themes, and context files |
 | `/hotkeys` | Show active keyboard shortcuts |
 | `/changelog` | Show changelog entries |
-| `/quit` | Quit Pi |
+| `/quit` | Quit Stela |
 
 ## Commands added by resources
 

@@ -2,7 +2,7 @@
 
 Every tool call passes a permission gate before it runs. The gate decides from the permission mode and from `allow`, `ask`, and `deny` rules. A call is allowed, denied with a reason, or shown to you for approval.
 
-The gate is not a sandbox. An allowed command runs with the permissions of the Stela process, and a command the analyzer misreads can do more than it appears to. See [Run Pi safely](security.md) for isolation.
+The gate is not a sandbox. An allowed command runs with the permissions of the Stela process, and a command the analyzer misreads can do more than it appears to. See [Run Stela safely](security.md) for isolation.
 
 ## Modes
 

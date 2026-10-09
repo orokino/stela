@@ -6,11 +6,11 @@ In interactive mode, use `/settings` to change common preferences. For other opt
 
 ## Agent directory
 
-The agent directory is shown as `<agent-dir>` below. Set its location with the `STELA_CODING_AGENT_DIR` environment variable or the SDK's [`agentDir`](sdk.md) option. `PI_CODING_AGENT_DIR` does not override Stela state.
+The agent directory is shown as `<agent-dir>` below. Set its location with the `STELA_CODING_AGENT_DIR` environment variable or the SDK's [`agentDir`](sdk.md) option.
 
 | Path | Responsibility |
 |---|---|
-| `<agent-dir>/settings.json` | User-level [settings](settings.md), including preferences, defaults, resource paths, and Pi package declarations. |
+| `<agent-dir>/settings.json` | User-level [settings](settings.md), including preferences, defaults, resource paths, and Stela package declarations. |
 | `<agent-dir>/keybindings.json` | Custom terminal UI and application [keybindings](keybindings.md). |
 | `<agent-dir>/mcp.json` | [MCP servers](mcp.md) available in every project. |
 | `<agent-dir>/models.json` | [Compatible endpoints, models, and model overrides](models.md#configure-a-compatible-endpoint). |
@@ -27,7 +27,7 @@ The agent directory is shown as `<agent-dir>` below. Set its location with the `
 
 | Path | Responsibility |
 |---|---|
-| `.stela/settings.json` | Project-level [settings](settings.md), resource paths, and Pi package declarations. |
+| `.stela/settings.json` | Project-level [settings](settings.md), resource paths, and Stela package declarations. |
 | `.stela/mcp.json` | Project [MCP servers](mcp.md). |
 | `.stela/SYSTEM.md` | Replaces the system prompt for the project. |
 | `.stela/APPEND_SYSTEM.md` | Adds project-specific instructions to the system prompt. |

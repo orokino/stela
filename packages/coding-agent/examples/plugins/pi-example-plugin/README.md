@@ -2,7 +2,7 @@
 
 This package provides conventional `session` and `tui` Chord facets. The Session-worker facet provides a remote greeting service. The TUI facet contributes `/hello` and calls that service.
 
-The package needs no build script. Pi asks Chord to discover `src/session.ts` and `src/tui.ts`, builds both entries into its server-owned plugin cache, and sends the TUI artifact to clients.
+The package needs no build script. Stela asks Chord to discover `src/session.ts` and `src/tui.ts`, builds both entries into its server-owned plugin cache, and sends the TUI artifact to clients.
 
 From the repository root:
 

@@ -1,6 +1,6 @@
-# Pi Packages
+# Stela Packages
 
-Pi packages install and distribute extensions, skills, prompt templates, and themes as one unit. Use a package when a customization should be shared through npm or git, or when several resources belong together.
+Stela packages install and distribute extensions, skills, prompt templates, and themes as one unit. Use a package when a customization should be shared through npm or git, or when several resources belong together.
 
 A package is an ordinary directory or npm package. It can expose conventional resource directories, declare explicit paths under the `pi` key in `package.json`, and carry its own runtime dependencies.
 
@@ -9,28 +9,28 @@ A package is an ordinary directory or npm package. It can expose conventional re
 Install from npm, git, or a local path:
 
 ```bash
-pi install npm:@example/pi-tools@1.0.0
-pi install git:github.com/example/pi-tools@v1
-pi install ./local-package
+stela install npm:@example/pi-tools@1.0.0
+stela install git:github.com/example/pi-tools@v1
+stela install ./local-package
 ```
 
-`pi list` shows configured packages. Use `pi remove <source>` to remove one and `pi update --extensions` to reconcile package installations. See [Command Line](cli.md#package-commands) for every package command and option.
+`stela list` shows configured packages. Use `stela remove <source>` to remove one and `stela update --extensions` to reconcile package installations. See [Command Line](cli.md#package-commands) for every package command and option.
 
-Personal installs are written to `~/.stela/agent/settings.json`. Add `--local` or `-l` to write the package declaration to `.stela/settings.json`. Pi reads declarations from that file only after project trust is granted.
+Personal installs are written to `~/.stela/agent/settings.json`. Add `--local` or `-l` to write the package declaration to `.stela/settings.json`. Stela reads declarations from that file only after project trust is granted.
 
 Project packages are installed and loaded only after project trust is resolved. Packages can execute extension code and can include skills that instruct the model to run programs. Review third-party package source before installing it. Review project package declarations before granting project trust.
 
 Use `--extension` or `-e` to try a package for one invocation without adding it to settings:
 
 ```bash
-pi -e npm:@example/pi-tools
+stela -e npm:@example/pi-tools
 ```
 
 ## Choose a source
 
 | Source | Example | Behavior |
 |---|---|---|
-| npm | `npm:@example/pi-tools@1.0.0` | Installed under the Pi npm directory |
+| npm | `npm:@example/pi-tools@1.0.0` | Installed under the Stela npm directory |
 | git | `git:github.com/example/pi-tools@v1` | Cloned and reconciled to the selected ref |
 | URL | `https://github.com/example/pi-tools` | Treated as a git source |
 | Local | `./pi-tools` | Loaded from the resolved path without copying |
@@ -52,7 +52,7 @@ my-pi-package/
 └── themes/
 ```
 
-Without a `pi` manifest, Pi discovers TypeScript and JavaScript extensions, skill directories, Markdown prompts, and JSON themes from those directories.
+Without a `pi` manifest, Stela discovers TypeScript and JavaScript extensions, skill directories, Markdown prompts, and JSON themes from those directories.
 
 Use an explicit manifest when resources live elsewhere or need filtering:
 
@@ -75,9 +75,9 @@ The `pi-package` keyword makes an npm package eligible for discovery in the [Pi 
 
 ## Declare dependencies
 
-Put runtime packages imported by extensions in `dependencies`. Pi installs package dependencies when it installs an npm or git source.
+Put runtime packages imported by extensions in `dependencies`. Stela installs package dependencies when it installs an npm or git source.
 
-Pi supplies these packages to extensions and skills:
+Stela supplies these packages to extensions and skills:
 
 - `@earendil-works/pi-ai`
 - `@earendil-works/pi-agent-core`
@@ -85,9 +85,9 @@ Pi supplies these packages to extensions and skills:
 - `@earendil-works/pi-tui`
 - `typebox`
 
-Declare the host-provided packages listed above in `peerDependencies` with a `"*"` range and do not bundle them. Pi suppresses automatic peer installation for managed npm packages and git packages installed with npm, pnpm, or Bun. Local packages are not installed or modified, so their dependency tree remains the package author's responsibility.
+Declare the host-provided packages listed above in `peerDependencies` with a `"*"` range and do not bundle them. Stela suppresses automatic peer installation for managed npm packages and git packages installed with npm, pnpm, or Bun. Local packages are not installed or modified, so their dependency tree remains the package author's responsibility.
 
-Do not list host-provided packages in `dependencies`. A physical copy can bypass Pi's extension module mapping in compiled ESM and create duplicate classes, registries, and initialization work. Pi reports an extension warning when it detects this manifest configuration. Other Pi packages used as dependencies must be included in the published tarball and referenced through their `node_modules` resource paths.
+Do not list host-provided packages in `dependencies`. A physical copy can bypass Stela's extension module mapping in compiled ESM and create duplicate classes, registries, and initialization work. Stela reports an extension warning when it detects this manifest configuration. Other Stela packages used as dependencies must be included in the published tarball and referenced through their `node_modules` resource paths.
 
 Installed packages load with separate module roots. Do not rely on two packages sharing one dependency instance or one package resolving another package’s undeclared dependency.
 
@@ -118,12 +118,12 @@ For each resource type:
 
 Filters narrow the package manifest. They do not expose resources that the package itself did not declare.
 
-Run `pi config` to enable or disable discovered resources and pi's built-in extensions. It starts with personal configuration; press Tab to switch scope, or run `pi config --local` to start with project overrides.
+Run `stela config` to enable or disable discovered resources and Stela's built-in extensions. It starts with personal configuration; press Tab to switch scope, or run `stela config --local` to start with project overrides.
 
 ## Understand scope and identity
 
 The same package can appear in personal and project settings. A project entry normally replaces the personal entry. With `autoload: false`, the project entry instead acts as a filtering delta over the personal package.
 
-Pi identifies npm packages by package name, git packages by repository URL without the ref, and local packages by resolved absolute path. This prevents the same package from loading twice through equivalent declarations.
+Stela identifies npm packages by package name, git packages by repository URL without the ref, and local packages by resolved absolute path. This prevents the same package from loading twice through equivalent declarations.
 
 Use [Extensions](extensions.md), [Skills](skills.md), [Prompt Templates](prompt-templates.md), and [Themes](themes.md) to design each resource before packaging it.
