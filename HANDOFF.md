@@ -189,7 +189,7 @@ The approved plan, with phase details, decision ledger and implementation outlin
   both wasm files load from the checkout and from an `npm pack` copy; an RPC run and a tmux TUI run covered plan
   handoff, bash approval and auto mode (allow, deny, uncertain, Esc). Tools and how to rerun them:
   `docs/research/permissions/smoke/README.md` (git-ignored).
-- Not verified: Bun binary wasm paths (`build:binary`); Bun is not installed.
+- Bun binary wasm paths verified in 5.7 below.
 - `./test.sh` has failures that are not from this work: `fd` tests offline, tests still expecting pi names after the
   Stela cutover, unbuilt artifacts (pi-ai entry, chord, env daemon), a flaky `auth-storage` test, and 4 pi-ai
   model-metadata tests.
@@ -200,7 +200,11 @@ The approved plan, with phase details, decision ledger and implementation outlin
   in MCP messages and docs; `6bb6773e4` only the built-in `exit_plan_mode` skips the gate (user: identity check).
 - Live checks run from source with `./stela` (no build needed): print/json, tmux TUI (`pipe-pane` captures OSC 7501),
   and `rpc-smoke.mjs` with `./stela` as the CLI path.
-- Next: 5.7, the Bun binary wasm check; needs the user's go-ahead to install Bun and run `npm run build:binary`.
+- 5.7 done (2026-10-09): Bun 1.3.14 (the CI pin) installed to `~/.bun/bin` from the GitHub release, checksum
+  verified. Built with `npm run build:offline` plus the `bun build --compile` and `copy-binary-assets` steps of
+  `build:binary` (which would otherwise regenerate models over the network). A copy of `dist/pi` with its assets
+  outside the repo parses `ls && cat a.txt | wc -l` (allowed) and flags `git push --force`; without
+  `tree-sitter-bash.wasm` it fails closed with "shell parser unavailable". Permission modes work is complete.
   Still open from 5.5: "Pi"/`pi` in doc prose and command examples, and `examples/` READMEs with `~/.pi` paths.
 
 **Operational lessons (see also Claude memory `rea-reliability`):**
