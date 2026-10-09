@@ -149,6 +149,53 @@ Historical measurement takeaways, not benchmarks of this new source checkout:
   Do not spend the next session re-running the same small set; fix visibility boundaries before any
   future held-out comparison.
 
+## Current work — permission modes (started 2026-10-08)
+
+First capability: core permission modes. The 5 modes are fixed by the user: bypass permissions, auto, manual, accept edits, plan. Scope:
+- the tool-approval gate;
+- allow/ask/deny rules;
+- the inline TUI approval dialog;
+- the mode cycle key, `/permissions` picker and footer indicator.
+
+The approved plan, with phase details, decision ledger and implementation outline, is
+`~/.claude/plans/stela-read-handoff-md-first-glistening-galaxy.md`.
+
+**Phase 1 (permission-only RE of 7 CLIs) is done, including the follow-ups (2026-10-09).**
+- Reports are in `docs/research/permissions/<target>.md` (git-ignored) for claude-code, codex, opencode, cursor-agent, omp, grok and devin.
+- Evidence strength:
+  - code-level: claude-code, codex, opencode, cursor-agent, omp;
+  - grok and devin: full Ghidra analyses plus a pseudocode review. Code confirms only a few points: grok's mode resolver and classifier timeout, and devin's CLI default mode. The rest is documented behavior.
+- Follow-ups ran one at a time through Orca run `run_763155b8c450`; this session's coordinator terminal is bound with `run-use`. The queue is `~/.cache/stela-rea/specs/queue.txt`; all items are done.
+
+**Phase 2 is done:** `docs/research/permissions/DECISIONS.md` has the follow-ups folded in, and no pick changed.
+
+**Implementation: steps 1–4 of `docs/research/permissions/PLAN.md` are committed (2026-10-09).**
+- `4799266e8`: the gate, rules, workspace scope and protected paths, the tree-sitter bash analyzer, the
+  `PermissionController`, the approval dialog, `permissions.*` settings, and the flags `--permission-mode`,
+  `--allow-bypass-permissions` and `--add-dir`. The `plan-mode` example extension was removed.
+- `72e2111fc`: Shift+Tab mode cycle (thinking moved to Alt+T), the `/permissions` picker, `/plan`, and the footer
+  mode indicator.
+- Code: `packages/coding-agent/src/core/permissions/`. The gate is an SDK option (`createAgentSession({ permissions })`);
+  the Stela CLI always enables it, and SDK callers without it behave as before.
+- Tests: `test/permissions-{core,bash,ui}.test.ts` and `test/suite/agent-session-permissions.test.ts`, 52 in total.
+  A live tmux run with a scripted faux provider passed. `npm run check` is clean.
+- `./test.sh` has failures that are not from this work: `fd` tests offline, tests still expecting pi names after the
+  Stela cutover, unbuilt artifacts (pi-ai entry, chord, env daemon), a flaky `auth-storage` test, and 4 pi-ai
+  model-metadata tests.
+- Not verified: the npm bundle and Bun binary wasm paths (`npm run build` was not run).
+- Next: step 5 (`exit_plan_mode`), step 6 (auto classifier), the D14 extension API, then step 7 (docs, RPC smoke
+  test, build verification). Details and small follow-ups are under "Remaining" in `PLAN.md`.
+
+**Operational lessons (see also Claude memory `rea-reliability`):**
+- **Load:**
+  - Run one heavy worker at a time; the Orca server crashed when 7 ran in parallel.
+  - Close finished worker terminals: `step.sh` does it; release alone leaves them retained.
+  - Claude Code reaps its own background shells under memory pressure. Do not rely on them for safety.
+- **REA JavaScript analyzer:** the MCP call fails with "Invalid string length" because the result is huge (574 MB for Cursor). Run the REA CLI to a file and query it with jq or a streaming script.
+- **REA Ghidra:** use the capped toolkit `~/.cache/stela-rea/ghidra/` (see its README.md), never REA `open_binary` or a direct `analyzeHeadless` on large native targets. `ghidra-run.sh` checks the guard, at least 8 GB available, and a single instance. It runs in an 8 GB / no-swap systemd scope, verifies the cap on the JVM cgroup, logs memory, and keeps `java.io.tmpdir` off the `/tmp` tmpfs. `StringXrefs.java` maps tokens to functions, including inside packed Rust strings. `ExportDecompiled.java` writes pseudocode or an `.asm` fallback. Workers must read the code: string xrefs alone gave three wrong labels in grok.
+  - The guard `stela-ghidra-guard` (`~/.cache/stela-rea/ghidra-guard.sh`, log `guard.log`) has a 10 h limit; it was renewed at 10:26 on 2026-10-09. It kills uncapped Ghidra JVMs, and any Ghidra when available memory drops below 2.5 GB.
+- **Codex update prompt:** Codex 0.160.0 shows an update prompt on startup. "Skip until next version" was chosen once to keep the RE target version fixed.
+
 ## Next session — reverse engineering and building
 
 1. Start from this checkout and this handoff. Stela identity/launch/state isolation is implemented;
@@ -161,8 +208,10 @@ Historical measurement takeaways, not benchmarks of this new source checkout:
    the actual CLI/TUI path. Apply the frozen visual tokens when UI work begins. No automatic prototype
    port, recovered prompt import, extension inlining, GUI launch, or SQLite migration.
 
-Suggested opening prompt:
+Suggested opening prompt (permission modes, in progress):
 
-> Stela. Read HANDOFF.md. Continue from the isolated Stela CLI in the clean Pi fork,
-> not claudeish-pi. Select one concrete missing capability, review behavioral evidence,
-> and implement it cleanly. Keep the prototype and recovered material private.
+> Stela. Read HANDOFF.md "Current work — permission modes" and the "Remaining" list in
+> docs/research/permissions/PLAN.md. Steps 1–4 are committed. Continue with step 5 (exit_plan_mode),
+> then step 6 (auto-mode classifier with fail-to-ask, timeout and breaker), then the D14 extension
+> API, each with tests and npm run check, and commit each step. Ask me before running npm run build
+> for step 7. Do not overload the machine.
