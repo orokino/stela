@@ -104,6 +104,12 @@ import {
 } from "../../core/model-resolver.ts";
 import { CredentialSynchronizationError } from "../../core/model-runtime.ts";
 import { DefaultPackageManager } from "../../core/package-manager.ts";
+import {
+	PERMISSION_MODE_LABELS,
+	PERMISSION_MODES,
+	type PermissionMode,
+	parsePermissionMode,
+} from "../../core/permissions/modes.ts";
 import { RADIUS_MCP_URL, RADIUS_PROVIDER_ID } from "../../core/radius.ts";
 import type { ResourceDiagnostic } from "../../core/resource-loader.ts";
 import { formatMissingSessionCwdPrompt, MissingSessionCwdError } from "../../core/session-cwd.ts";
@@ -160,6 +166,7 @@ import {
 	formatAuthSelectorProviderType,
 	OAuthSelectorComponent,
 } from "./components/oauth-selector.ts";
+import { PermissionModeSelectorComponent } from "./components/permission-mode-selector.ts";
 import { piLogoLines, piWordmark, supportsPiLogo } from "./components/pi-logo.ts";
 import { createLoginMenuSelector } from "./components/radius-login-selector.ts";
 import { ScopedModelsSelectorComponent } from "./components/scoped-models-selector.ts";
@@ -524,6 +531,7 @@ export class InteractiveMode {
 
 	// Agent subscription unsubscribe function
 	private unsubscribe?: () => void;
+	private unsubscribePermissionMode?: () => void;
 	private signalCleanupHandlers: Array<() => void> = [];
 
 	// Track if editor is in bash mode (text starts with !)
@@ -1030,6 +1038,7 @@ export class InteractiveMode {
 					hint("app.exit", "to exit (empty)"),
 					hint("app.suspend", "to suspend"),
 					keyHint("tui.editor.deleteToLineEnd", "to delete to end"),
+					hint("app.permissions.cycle", "to cycle permission mode"),
 					hint("app.thinking.cycle", "to cycle thinking level"),
 					rawKeyHint(
 						`${keyText("app.model.cycleForward")}/${keyText("app.model.cycleBackward")}`,
@@ -2098,6 +2107,11 @@ export class InteractiveMode {
 		this.unsubscribe = undefined;
 		this.programStatus.reset();
 		this.applyRuntimeSettings();
+		this.unsubscribePermissionMode?.();
+		this.unsubscribePermissionMode = session.permissions?.onModeChange(() => {
+			this.footer.invalidate();
+			this.ui.requestRender();
+		});
 
 		if (options.renderBeforeBind) {
 			this.renderCurrentSessionState();
@@ -3103,6 +3117,7 @@ export class InteractiveMode {
 		this.defaultEditor.onAction("app.clear", () => this.handleCtrlC());
 		this.defaultEditor.onCtrlD = () => this.handleCtrlD();
 		this.defaultEditor.onAction("app.suspend", () => this.handleCtrlZ());
+		this.defaultEditor.onAction("app.permissions.cycle", () => this.cyclePermissionMode());
 		this.defaultEditor.onAction("app.thinking.cycle", () => this.cycleThinkingLevel());
 		this.defaultEditor.onAction("app.model.cycleForward", () => this.cycleModel("forward"));
 		this.defaultEditor.onAction("app.model.cycleBackward", () => this.cycleModel("backward"));
@@ -3220,6 +3235,17 @@ export class InteractiveMode {
 				const searchTerm = text.startsWith("/model ") ? text.slice(7).trim() : undefined;
 				this.editor.setText("");
 				await this.handleModelCommand(searchTerm);
+				return;
+			}
+			if (text === "/permissions" || text.startsWith("/permissions ")) {
+				const argument = text.startsWith("/permissions ") ? text.slice(13).trim() : undefined;
+				this.editor.setText("");
+				this.handlePermissionsCommand(argument);
+				return;
+			}
+			if (text === "/plan") {
+				this.editor.setText("");
+				this.togglePlanMode();
 				return;
 			}
 			if (text === "/thinking" || text.startsWith("/thinking ")) {
@@ -4526,6 +4552,66 @@ export class InteractiveMode {
 		}
 		this.activeStatusIndicator?.invalidate();
 		this.ui.requestRender();
+	}
+
+	private cyclePermissionMode(): void {
+		const permissions = this.session.permissions;
+		if (!permissions) {
+			this.showStatus("Permission modes are not enabled in this session");
+			return;
+		}
+		this.showStatus(`Permission mode: ${PERMISSION_MODE_LABELS[permissions.cycleMode()]}`);
+	}
+
+	private setPermissionMode(mode: PermissionMode): void {
+		const permissions = this.session.permissions;
+		if (!permissions) {
+			this.showError("Permission modes are not enabled in this session");
+			return;
+		}
+		try {
+			permissions.setMode(mode);
+			this.showStatus(`Permission mode: ${PERMISSION_MODE_LABELS[mode]}`);
+		} catch (error) {
+			this.showError(error instanceof Error ? error.message : String(error));
+		}
+	}
+
+	private togglePlanMode(): void {
+		const permissions = this.session.permissions;
+		this.setPermissionMode(permissions?.mode === "plan" ? "manual" : "plan");
+	}
+
+	private handlePermissionsCommand(argument?: string): void {
+		if (argument) {
+			const mode = parsePermissionMode(argument);
+			if (!mode) {
+				this.showError(`Unknown permission mode "${argument}". Available modes: ${PERMISSION_MODES.join(", ")}.`);
+				return;
+			}
+			this.setPermissionMode(mode);
+			return;
+		}
+		const permissions = this.session.permissions;
+		if (!permissions) {
+			this.showError("Permission modes are not enabled in this session");
+			return;
+		}
+		this.showSelector((done) => {
+			const selector = new PermissionModeSelectorComponent(
+				permissions.mode,
+				permissions.getAvailability(),
+				(mode) => {
+					done();
+					this.setPermissionMode(mode);
+				},
+				() => {
+					done();
+					this.ui.requestRender();
+				},
+			);
+			return { component: selector, focus: selector };
+		});
 	}
 
 	private cycleThinkingLevel(): void {
@@ -6842,6 +6928,7 @@ export class InteractiveMode {
 		const clear = this.getAppKeyDisplay("app.clear");
 		const exit = this.getAppKeyDisplay("app.exit");
 		const suspend = this.getAppKeyDisplay("app.suspend");
+		const cyclePermissionMode = this.getAppKeyDisplay("app.permissions.cycle");
 		const cycleThinkingLevel = this.getAppKeyDisplay("app.thinking.cycle");
 		const cycleModelForward = this.getAppKeyDisplay("app.model.cycleForward");
 		const selectModel = this.getAppKeyDisplay("app.model.select");
@@ -6887,6 +6974,7 @@ export class InteractiveMode {
 | \`${clear}\` | Clear editor (first) / exit (second) |
 | \`${exit}\` | Exit (when editor is empty) |
 | \`${suspend}\` | Suspend to background |
+| \`${cyclePermissionMode}\` | Cycle permission mode |
 | \`${cycleThinkingLevel}\` | Cycle thinking level |
 | \`${cycleModelForward}\` / \`${cycleModelBackward}\` | Cycle models |
 | \`${selectModel}\` | Open model selector |

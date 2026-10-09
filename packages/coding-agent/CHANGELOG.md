@@ -5,10 +5,14 @@
 ### Breaking Changes
 
 - Moved the published theme JSON Schema to `schemas/theme.schema.json` and made theme loading reject unknown top-level properties and unknown properties under `colors` or `export`. Update existing theme `$schema` references to the new path, define reusable custom colors under `vars`, and remove unsupported metadata.
+- Moved the thinking-level cycle from `Shift+Tab` to `Alt+T`; `Shift+Tab` now cycles the permission mode. Both stay rebindable (`app.thinking.cycle`, `app.permissions.cycle`).
+- Removed the `plan-mode` example extension; plan mode is built in.
 - Cut over this fork to the `stela` command, `~/.stela/agent` global state, `.stela` project configuration, and Stela-specific directory overrides. Pi state is not imported automatically; upstream package names and persistence formats are retained.
 
 ### Added
 
+- Added permission modes for tool calls: manual (default), accept edits, plan, auto, and bypass permissions. Rules `Tool` or `Tool(specifier)` in `permissions.allow`/`ask`/`deny` apply in every mode (deny > ask > allow); project rules apply only in trusted projects. Bash commands are parsed so each segment, substitution, and redirect is checked. Calls that need approval open a dialog (once, this session, always in this project, or no with optional feedback); print and json modes deny them with a reason.
+- Added `--permission-mode`, `--allow-bypass-permissions`, and `--add-dir`, the `/permissions` picker, `/plan`, and the permission mode at the start of the footer.
 - Added a Node-based checkout launcher and non-overwriting per-user installer for `stela`; existing global `pi` installations remain separate.
 
 ### Changed

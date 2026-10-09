@@ -30,8 +30,12 @@ const APP_KEYBINDINGS = {
 		defaultKeys: process.platform === "win32" ? [] : "ctrl+z",
 		description: "Suspend to background",
 	},
-	"app.thinking.cycle": {
+	"app.permissions.cycle": {
 		defaultKeys: "shift+tab",
+		description: "Cycle permission mode",
+	},
+	"app.thinking.cycle": {
+		defaultKeys: "alt+t",
 		description: "Cycle thinking level",
 	},
 	"app.thinking.save": {

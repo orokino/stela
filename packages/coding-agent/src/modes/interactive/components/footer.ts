@@ -4,6 +4,7 @@ import type { AgentSession } from "../../../core/agent-session.ts";
 import { areExperimentalFeaturesEnabled } from "../../../core/experimental.ts";
 import type { ContextUsage } from "../../../core/extensions/types.ts";
 import type { ReadonlyFooterDataProvider } from "../../../core/footer-data-provider.ts";
+import { PERMISSION_MODE_LABELS, type PermissionMode } from "../../../core/permissions/modes.ts";
 import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../../../core/usage-totals.ts";
 import { theme } from "../theme/theme.ts";
 
@@ -176,8 +177,10 @@ export class FooterComponent implements Component {
 			pwd = `${pwd} • ${sessionName}`;
 		}
 
-		// Build stats line
+		// Build stats line; the permission mode comes first and is always shown when the gate is enabled.
 		const statsParts = [];
+		const permissionMode = this.session.permissions?.mode;
+		if (permissionMode) statsParts.push(formatPermissionMode(permissionMode));
 		if (usageTotals.input) statsParts.push(`↑${formatTokens(usageTotals.input)}`);
 		if (usageTotals.output) statsParts.push(`↓${formatTokens(usageTotals.output)}`);
 		if (usageTotals.cacheRead) statsParts.push(`R${formatTokens(usageTotals.cacheRead)}`);
@@ -298,5 +301,20 @@ export class FooterComponent implements Component {
 		}
 
 		return lines;
+	}
+}
+
+/** Status colors carry state: bypass is an error color, auto a warning, manual muted, the rest plain. */
+function formatPermissionMode(mode: PermissionMode): string {
+	const label = PERMISSION_MODE_LABELS[mode];
+	switch (mode) {
+		case "bypassPermissions":
+			return theme.bold(theme.fg("error", label));
+		case "auto":
+			return theme.fg("warning", label);
+		case "manual":
+			return theme.fg("muted", label);
+		default:
+			return label;
 	}
 }
