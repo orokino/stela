@@ -42,8 +42,11 @@ one native executable with its own `~/.stela/agent` state. The Node-based comman
 first step, not the native package. Keep inherited persistence initially; defer a Stela
 SQLite migration, the desktop GUI, and the seven-target reverse-engineering sweep.
 
-Subagent preference: **`gpt-6-luna`**. Select it when the orchestration interface supports a model
-override; otherwise disclose the limitation rather than silently substituting another model.
+Subagent preference (2026-10-09): **DeepSeek V4.1 Flash at max thinking, via the OpenCode Go provider, running in
+OMP**. Orca: `worker-start --agent omp --model opencode-go/deepseek-v4.1-flash:max` (OMP accepts `--model` but not
+`--effort`; the `:max` suffix is OMP's thinking-level selector, seen in `~/.omp/logs`). Check `launch.effective` in the
+receipt and report if model or thinking level differ; never substitute another model silently. Earlier workers in
+this handoff used `gpt-6-luna`.
 
 ### Frozen visual tokens — shared by eventual TUI and GUI
 
@@ -255,5 +258,5 @@ Suggested opening prompt (UI/UX):
 > Stela. Read HANDOFF.md ("Agreed direction", "Frozen visual tokens", "Current work") and
 > docs/research/permissions/ for how the permission-modes RE was scoped. Propose a UI/UX-only question
 > list for reverse engineering the other CLIs' TUIs (claude-code, codex, opencode, cursor-agent, omp,
-> grok, devin) and ask me to approve it before starting any worker. Workers: gpt-6-luna, effort max,
-> one heavy worker at a time. Do not overload the machine.
+> grok, devin) and ask me to approve it before starting any worker. Workers: DeepSeek V4.1 Flash (max) via
+> OpenCode Go in OMP (see "Subagent preference"), one heavy worker at a time. Do not overload the machine.
