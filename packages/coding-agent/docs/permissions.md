@@ -159,7 +159,7 @@ The timeout is `permissions.auto.timeoutMs`: 30 seconds by default, clamped to 1
 
 ## Extensions
 
-Extension `tool_call` handlers run before the gate. They can block a call or rewrite its arguments, and the gate then checks the final arguments, so a rewrite cannot skip it. Extensions cannot add rules or grants.
+Extension `tool_call` handlers run before the gate. They can block a call or rewrite its arguments, and the gate then checks the final arguments, so a rewrite cannot skip it. Extensions cannot add rules or grants. Tools an extension registers are gated like MCP tools: they ask unless a rule allows them. This includes a tool that replaces a built-in, such as `exit_plan_mode`; only the built-in `exit_plan_mode` skips the gate, because it has its own dialog.
 
 ```typescript
 export default function (pi: ExtensionAPI) {

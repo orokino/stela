@@ -699,6 +699,12 @@ export class AgentSession {
 		}
 
 		if (!this.permissions) return undefined;
+		// The built-in exit_plan_mode asks the user in its own dialog. A tool registered under that name by an
+		// extension or the SDK replaces it and is gated like any other tool.
+		const definition = this._toolDefinitions.get(toolCall.name)?.definition;
+		if (toolCall.name === EXIT_PLAN_MODE_TOOL_NAME && definition === this._baseToolDefinitions.get(toolCall.name)) {
+			return undefined;
+		}
 		const prompter = runner.hasUI() ? createUIPermissionPrompter(runner.getUIContext()) : undefined;
 		const check = await this.permissions.check(toolCall.name, args, {
 			prompter,

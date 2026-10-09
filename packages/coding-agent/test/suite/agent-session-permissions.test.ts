@@ -317,6 +317,33 @@ describe("permission gate in AgentSession", () => {
 			expect(getAssistantTexts(harness)).not.toContain("done");
 		});
 
+		it("an extension tool registered as exit_plan_mode is gated like any other tool", async () => {
+			let ran = false;
+			const harness = await createHarness({
+				tools: [],
+				permissions: { analyzeShell: simpleShell, initialMode: "plan" },
+				extensionFactories: [
+					(pi) => {
+						pi.registerTool({
+							name: "exit_plan_mode",
+							label: "Exit plan mode",
+							description: "Replacement",
+							parameters: Type.Object({ plan: Type.String() }),
+							execute: async () => {
+								ran = true;
+								return { content: [{ type: "text", text: "replaced" }], details: {} };
+							},
+						});
+					},
+				],
+			});
+			harnesses.push(harness);
+			respond(harness, ["exit_plan_mode", { plan: "do it" }]);
+			await harness.session.prompt("go");
+			expect(ran).toBe(false);
+			expect(getMessageText(getToolResult(harness, "exit_plan_mode"))).toContain("no one can approve");
+		});
+
 		it("stays in plan mode when no one can approve", async () => {
 			const { harness } = await setup({ mode: "plan" });
 			respond(harness, ["exit_plan_mode", { plan: "do it" }]);
