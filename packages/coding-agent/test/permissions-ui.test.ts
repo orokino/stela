@@ -35,7 +35,7 @@ const footerData: ReadonlyFooterDataProvider = {
 };
 
 function statsLine(mode: PermissionMode | undefined): string {
-	return stripAnsi(new FooterComponent(session(mode), footerData).render(120)[1] ?? "");
+	return stripAnsi(new FooterComponent(session(mode), footerData).render(120)[0] ?? "");
 }
 
 describe("permission modes UI", () => {
@@ -46,9 +46,9 @@ describe("permission modes UI", () => {
 		expect(KEYBINDINGS["app.thinking.cycle"].defaultKeys).toBe("alt+t");
 	});
 
-	it("shows the mode first on the footer stats line", () => {
-		expect(statsLine("manual").startsWith("manual ")).toBe(true);
-		expect(statsLine("bypassPermissions").startsWith("bypass permissions ")).toBe(true);
+	it("keeps model and mode in the composer border, not the footer", () => {
+		expect(statsLine("manual")).not.toContain("manual");
+		expect(statsLine("bypassPermissions")).not.toContain("bypass permissions");
 		expect(statsLine(undefined)).not.toContain("manual");
 	});
 

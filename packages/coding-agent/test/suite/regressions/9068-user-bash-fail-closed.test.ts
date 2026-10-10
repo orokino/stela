@@ -127,6 +127,7 @@ type InteractiveBashContext = {
 	handleBashCommand(command: string, excludeFromContext?: boolean): Promise<void>;
 	showError(message: string): void;
 	updateEditorBorderColor(): void;
+	updatePendingMessagesDisplay(): void;
 };
 
 const interactiveModePrototype = InteractiveMode.prototype as unknown as {
@@ -249,6 +250,7 @@ describe("Interactive user_bash failure handling (#9068)", () => {
 			handleBashCommand: interactiveModePrototype.handleBashCommand,
 			showError: vi.fn(),
 			updateEditorBorderColor: vi.fn(),
+			updatePendingMessagesDisplay: vi.fn(),
 		};
 		interactiveModePrototype.setupEditorSubmitHandler.call(context);
 

@@ -124,10 +124,18 @@ describe("formatCwdForFooter", () => {
 	});
 });
 
-describe("FooterComponent width handling", () => {
+describe("FooterComponent one-row ladder", () => {
 	beforeAll(() => {
 		initTheme(undefined, false);
 	});
+
+	function renderOneRow(session: AgentSession, providerCount: number, width: number): string {
+		const footer = new FooterComponent(session, createFooterData(providerCount));
+		footer.setShowExtendedTelemetry(true);
+		const lines = footer.render(width);
+		expect(lines.length).toBe(1);
+		return stripAnsi(lines[0] ?? "");
+	}
 
 	it("keeps all lines within width for wide session names", () => {
 		const width = 93;
@@ -135,6 +143,7 @@ describe("FooterComponent width handling", () => {
 		const footer = new FooterComponent(session, createFooterData(1));
 
 		const lines = footer.render(width);
+		expect(lines.length).toBe(1);
 		for (const line of lines) {
 			expect(visibleWidth(line)).toBeLessThanOrEqual(width);
 		}
@@ -159,27 +168,23 @@ describe("FooterComponent width handling", () => {
 		const footer = new FooterComponent(session, createFooterData(2));
 
 		const lines = footer.render(width);
+		expect(lines.length).toBe(1);
 		for (const line of lines) {
 			expect(visibleWidth(line)).toBeLessThanOrEqual(width);
 		}
 	});
 
-	it("shows the physical model a virtual model routed to", () => {
-		const session = createSession({
-			sessionName: "",
-			modelId: "auto",
-			reasoning: true,
-			thinkingLevel: "high",
-			routedModel: { model: { id: "gpt-5.6-luna" }, thinkingLevel: "medium" },
-		});
-		const footer = new FooterComponent(session, createFooterData(1));
-
-		const statsLine = stripAnsi(footer.render(120)[1]);
-
-		expect(statsLine).toContain("auto \u2022 high \u2192 gpt-5.6-luna \u2022 medium");
+	it("renders a single row with no model, mode, or hints", () => {
+		const session = createSession({ sessionName: "fix-footer" });
+		const line = renderOneRow(session, 1, 120);
+		expect(line).toContain("/tmp/project (main)");
+		expect(line).toContain("fix-footer");
+		expect(line).toContain("◫ 12.3%/200k");
+		expect(line).not.toContain("test-model");
+		expect(line).not.toContain("manual");
 	});
 
-	it("includes summary and tool result usage in the total cost", () => {
+	it("shows extended telemetry only when opted in", () => {
 		const session = createSession({
 			sessionName: "",
 			usage: {
@@ -211,20 +216,21 @@ describe("FooterComponent width handling", () => {
 				cost: { total: 0.375 },
 			},
 		});
-		const footer = new FooterComponent(session, createFooterData(1));
-
-		const statsLine = stripAnsi(footer.render(120)[1]);
-		expect(statsLine).toContain("$1.250");
+		expect(renderOneRow(session, 1, 120)).toContain("$1.25");
+		const off = stripAnsi(new FooterComponent(session, createFooterData(1)).render(120)[0] ?? "");
+		expect(off).not.toContain("$");
+		expect(off).toContain("◫ 12.3%/200k");
 	});
 
 	it("updates cached usage totals after an entry is appended", () => {
 		const usage = { input: 10, output: 1, cacheRead: 0, cacheWrite: 0, cost: { total: 0.5 } };
 		const session = createSession({ sessionName: "", usage });
 		const footer = new FooterComponent(session, createFooterData(1));
-		expect(stripAnsi(footer.render(120)[1])).toContain("$0.500");
+		footer.setShowExtendedTelemetry(true);
+		expect(stripAnsi(footer.render(120)[0] ?? "")).toContain("$0.50");
 
 		session.sessionManager.getEntries().push({ type: "message", message: { role: "assistant", usage } } as never);
-		expect(stripAnsi(footer.render(120)[1])).toContain("$1.000");
+		expect(stripAnsi(footer.render(120)[0] ?? "")).toContain("$1.00");
 	});
 
 	it("shows the latest cache hit rate when cache usage is present", () => {
@@ -238,10 +244,7 @@ describe("FooterComponent width handling", () => {
 				cost: { total: 0.001 },
 			},
 		});
-		const footer = new FooterComponent(session, createFooterData(1));
-
-		const statsLine = stripAnsi(footer.render(120)[1]);
-		expect(statsLine).toContain("CH25.0%");
+		expect(renderOneRow(session, 1, 120)).toContain("CH25.0%");
 	});
 
 	it("marks Kimi Coding costs as subscription estimates", () => {
@@ -256,16 +259,12 @@ describe("FooterComponent width handling", () => {
 				cost: { total: 1.234 },
 			},
 		});
-		const footer = new FooterComponent(session, createFooterData(1));
-
-		expect(stripAnsi(footer.render(120)[1])).toContain("$1.234 (sub)");
+		expect(renderOneRow(session, 1, 120)).toContain("$1.23 (sub)");
 	});
 
 	it("marks explicitly identified subscription auth", () => {
 		const session = createSession({ sessionName: "", provider: "anthropic", usingSubscription: true });
-		const footer = new FooterComponent(session, createFooterData(1));
-
-		expect(stripAnsi(footer.render(120)[1])).toContain("$0.000 (sub)");
+		expect(renderOneRow(session, 1, 120)).toContain("$0.00 (sub)");
 	});
 
 	it("does not mark generic OAuth sign-in as a subscription", () => {
@@ -280,21 +279,37 @@ describe("FooterComponent width handling", () => {
 				cost: { total: 1.234 },
 			},
 		});
-		const footer = new FooterComponent(session, createFooterData(1));
-		const stats = stripAnsi(footer.render(120)[1]);
-
-		expect(stats).toContain("$1.234");
+		const stats = renderOneRow(session, 1, 120);
+		expect(stats).toContain("$1.23");
 		expect(stats).not.toContain("(sub)");
 	});
 
+	it("counts distinct files edited", () => {
+		const editUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } };
+		const session = createSession({ sessionName: "" });
+		session.sessionManager.getEntries().push({
+			type: "message",
+			message: {
+				role: "assistant",
+				usage: editUsage,
+				content: [
+					{ type: "toolCall", id: "1", name: "edit", arguments: { path: "a.txt" } },
+					{ type: "toolCall", id: "2", name: "write", arguments: { path: "b.txt" } },
+					{ type: "toolCall", id: "3", name: "edit", arguments: { path: "a.txt" } },
+				],
+			},
+		} as never);
+		expect(renderOneRow(session, 1, 120)).toContain("2 files");
+	});
+
 	it("encodes the context warning as glyph plus word, not colour alone", () => {
-		const render = (percent: number): string =>
-			stripAnsi(
-				new FooterComponent(
-					createSession({ sessionName: "", contextPercent: percent }),
-					createFooterData(1),
-				).render(120)[1],
+		const render = (percent: number): string => {
+			const footer = new FooterComponent(
+				createSession({ sessionName: "", contextPercent: percent }),
+				createFooterData(1),
 			);
+			return stripAnsi(footer.render(120)[0] ?? "");
+		};
 		expect(render(12.3)).toContain("◫ 12.3%/200k");
 		expect(render(12.3)).not.toContain("high");
 		expect(render(75)).toContain("◫ 75.0%/200k high");
@@ -313,10 +328,21 @@ describe("FooterComponent width handling", () => {
 			createSession({ sessionName: "", modelId: "m1", isStreaming: true }),
 			createFooterData(1),
 		);
-		const stats = stripAnsi(footer.render(120)[1]);
+		const stats = stripAnsi(footer.render(120)[0] ?? "");
 		expect(stats).toContain("Working");
 		expect(stats).toContain("to interrupt");
 		expect(stats).not.toContain("m1");
+	});
+
+	it("drops telemetry, then session, then path, keeping context pinned", () => {
+		const session = createSession({ sessionName: "fix-footer" });
+		const footer = new FooterComponent(session, createFooterData(1));
+		footer.setShowExtendedTelemetry(true);
+		const narrow = stripAnsi(footer.render(40)[0] ?? "");
+		expect(narrow).toContain("◫ 12.3%/200k");
+		expect(visibleWidth(narrow)).toBeLessThanOrEqual(40);
+		const wide = renderOneRow(session, 1, 120);
+		expect(wide).toContain("fix-footer");
 	});
 
 	it("keeps the context segment at 40 columns", () => {

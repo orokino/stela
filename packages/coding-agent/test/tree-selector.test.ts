@@ -311,7 +311,7 @@ describe("TreeSelectorComponent", () => {
 	});
 
 	describe("copy", () => {
-		test("copies the full selected message with ctrl+x", () => {
+		test("copies the full selected message with alt+c", () => {
 			const message = `${"long message ".repeat(30)}\nsecond line`;
 			const tree = buildTree([userMessage("user-1", null, "hello"), assistantMessage("asst-1", "user-1", message)]);
 			const selector = new TreeSelectorComponent(
@@ -326,7 +326,7 @@ describe("TreeSelectorComponent", () => {
 				copied = text;
 			};
 
-			selector.handleInput("\x18");
+			selector.handleInput("\x1bc");
 
 			expect(copied).toBe(message);
 		});

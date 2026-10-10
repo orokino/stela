@@ -30,8 +30,23 @@ describe("task HUD", () => {
 	it("warns after 5 seconds and speaks ASCII", () => {
 		const hud = new TaskHudComponent(1);
 		hud.setShells([{ name: "shell 1", command: "sleep 30", startedAt: Date.now() - 6000 }]);
-		expect(stripAnsi(hud.render(80).join("\n"))).toContain("⏹ shell 1 sleep 30");
+		expect(stripAnsi(hud.render(80).join("\n"))).toContain("⏹ shell 1 sleep 30 · 6s");
 		setSymbolPreset("ascii");
-		expect(stripAnsi(hud.render(80).join("\n"))).toContain("[bg] shell 1 sleep 30");
+		expect(stripAnsi(hud.render(80).join("\n"))).toContain("[bg] shell 1 sleep 30 / 6s");
+	});
+
+	it("keeps a Finished row for background completions only", () => {
+		const hud = new TaskHudComponent(1);
+		hud.addFinished("sleep 6");
+		const rendered = stripAnsi(hud.render(80).join("\n"));
+		expect(rendered).toContain('Finished "sleep 6"');
+		// Foreground `!` shells surface completion through their tool card, so the
+		// caller (handleBashCommand) only calls addFinished for `!!` shells.
+		hud.addFinished("sleep 7");
+		hud.addFinished("sleep 8");
+		hud.addFinished("sleep 9");
+		const capped = stripAnsi(hud.render(80).join("\n"));
+		expect(capped).not.toContain('Finished "sleep 6"');
+		expect(capped).toContain('Finished "sleep 9"');
 	});
 });

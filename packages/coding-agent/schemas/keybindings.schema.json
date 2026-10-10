@@ -267,6 +267,14 @@
       "$ref": "#/$defs/KeybindingValue",
       "description": "Restore queued messages"
     },
+    "app.editor.pasteExpand": {
+      "$ref": "#/$defs/KeybindingValue",
+      "description": "Re-expand the most recent collapsed paste"
+    },
+    "app.shortcuts.toggle": {
+      "$ref": "#/$defs/KeybindingValue",
+      "description": "Show keyboard shortcuts"
+    },
     "app.clipboard.pasteImage": {
       "$ref": "#/$defs/KeybindingValue",
       "description": "Paste files on macOS, images, or text from clipboard"

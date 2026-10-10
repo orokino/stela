@@ -88,7 +88,7 @@ describe("Coding Agent Tools", () => {
 			expect(getTextOutput(result)).toBe(content);
 			// No truncation message since file fits within limits
 			expect(getTextOutput(result)).not.toContain("Use offset=");
-			expect(result.details).toBeUndefined();
+			expect(result.details).toEqual({ lineCount: 3 });
 			expect(result.structuredContent).toBe(content);
 		});
 
@@ -495,7 +495,7 @@ describe("Coding Agent Tools", () => {
 			const result = await bashTool.execute("test-call-8", { command: "echo 'test output'" });
 
 			expect(getTextOutput(result)).toContain("test output");
-			expect(result.details).toBeUndefined();
+			expect(result.details).toEqual({ exitCode: 0 });
 		});
 
 		it("should report non-zero exit codes as error results with structured content", async () => {

@@ -12,7 +12,7 @@ vi.mock("../src/utils/clipboard.ts", () => ({ copyToClipboard }));
 vi.mock("../src/utils/open-browser.ts", () => ({ openBrowser: vi.fn() }));
 
 const URL = `https://auth.example.invalid/authorize?${"x".repeat(300)}`;
-const CTRL_X = "\x18";
+const COPY_KEY = "\x1bc";
 
 const tui = { requestRender: vi.fn() } as unknown as TUI;
 
@@ -34,9 +34,9 @@ describe("sign-in URL copy key", () => {
 		const dialog = new LoginDialogComponent(tui, "test", () => {});
 		dialog.showAuth(URL);
 		void dialog.showManualInput("Paste the code:");
-		expect(rendered(dialog)).toContain("ctrl+x to copy");
+		expect(rendered(dialog)).toContain("alt+c to copy");
 
-		dialog.handleInput(CTRL_X);
+		dialog.handleInput(COPY_KEY);
 		await vi.waitFor(() => expect(rendered(dialog)).toContain("Copied URL to clipboard"));
 		expect(copyToClipboard).toHaveBeenCalledWith(URL);
 	});
@@ -44,16 +44,16 @@ describe("sign-in URL copy key", () => {
 	test("login dialog ignores the copy key without an auth URL", () => {
 		const dialog = new LoginDialogComponent(tui, "test", () => {});
 		dialog.showDeviceCode({ userCode: "ABCD", verificationUri: "https://example.invalid/device" });
-		dialog.handleInput(CTRL_X);
+		dialog.handleInput(COPY_KEY);
 		expect(copyToClipboard).not.toHaveBeenCalled();
 	});
 
 	test("MCP sign-in screen copies the authorization URL", async () => {
 		const view = new McpManagerView(tui, theme, new KeybindingsManager());
 		void view.redirectUrl("Sign in to issues", URL, new AbortController().signal);
-		expect(rendered(view)).toContain("ctrl+x to copy");
+		expect(rendered(view)).toContain("alt+c to copy");
 
-		view.handleInput(CTRL_X);
+		view.handleInput(COPY_KEY);
 		await vi.waitFor(() => expect(rendered(view)).toContain("Copied URL to clipboard"));
 		expect(copyToClipboard).toHaveBeenCalledWith(URL);
 	});

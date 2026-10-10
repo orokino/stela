@@ -45,10 +45,20 @@ describe("collapsible message components", () => {
 		});
 
 		expect(renderText(component)).not.toContain("compaction details");
-		clickRow(component, "[compaction]");
+		clickRow(component, "compaction");
 		expect(renderText(component)).toContain("compaction details");
-		clickRow(component, "[compaction]");
+		clickRow(component, "compaction");
 		expect(renderText(component)).not.toContain("compaction details");
+	});
+
+	test("renders the collapsed compaction divider with a token summary", () => {
+		const component = new CompactionSummaryMessageComponent({
+			role: "compactionSummary",
+			summary: "compaction details",
+			tokensBefore: 12000,
+			timestamp: Date.now(),
+		});
+		expect(renderText(component)).toContain("─── compaction · 12k in ───");
 	});
 
 	test("toggles a branch summary when clicked", () => {

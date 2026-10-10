@@ -93,6 +93,11 @@ export interface SettingsConfig {
 	defaultProjectTrust: DefaultProjectTrust;
 	clearOnShrink: boolean;
 	showTerminalProgress: boolean;
+	animationsEnabled: boolean;
+	symbolPreset: "unicode" | "ascii";
+	notificationMode: "off" | "auto" | "bell";
+	notifyWhenFocused: boolean;
+	fullscreenMouse: boolean;
 	tuiMode: TuiMode;
 	fullscreenExitOutput: FullscreenExitOutput;
 	fullscreenScrollbar: ScrollViewScrollbar;
@@ -132,6 +137,11 @@ export interface SettingsCallbacks {
 	onDefaultProjectTrustChange: (defaultProjectTrust: DefaultProjectTrust) => void;
 	onClearOnShrinkChange: (enabled: boolean) => void;
 	onShowTerminalProgressChange: (enabled: boolean) => void;
+	onAnimationsEnabledChange: (enabled: boolean) => void;
+	onSymbolPresetChange: (preset: "unicode" | "ascii") => void;
+	onNotificationModeChange: (mode: "off" | "auto" | "bell") => void;
+	onNotifyWhenFocusedChange: (enabled: boolean) => void;
+	onFullscreenMouseChange: (enabled: boolean) => void;
 	onTuiModeChange: (mode: TuiMode) => void;
 	onFullscreenExitOutputChange: (output: FullscreenExitOutput) => void;
 	onFullscreenScrollbarChange: (mode: ScrollViewScrollbar) => void;
@@ -863,6 +873,45 @@ export class SettingsSelectorComponent extends Container {
 			currentValue: config.showTerminalProgress ? "true" : "false",
 			values: ["true", "false"],
 		});
+		// CU settings pager shell (gap 7): INLINE typed editors for the
+		// phase-1 knobs that had no settings UI. Pager rows render in the
+		// shared SettingsList with Enter value / Enter JSON / X unset.
+		const terminalProgressIndex = items.findIndex((item) => item.id === "terminal-progress");
+		items.splice(terminalProgressIndex + 1, 0, {
+			id: "terminal-animations",
+			label: "Terminal animations",
+			description: "Animate spinners and progress indicators",
+			currentValue: config.animationsEnabled ? "true" : "false",
+			values: ["true", "false"],
+		});
+		items.splice(terminalProgressIndex + 2, 0, {
+			id: "terminal-symbols",
+			label: "Terminal symbols",
+			description: "Glyph set for spinners, markers, and rules",
+			currentValue: config.symbolPreset,
+			values: ["unicode", "ascii"],
+		});
+		items.splice(terminalProgressIndex + 3, 0, {
+			id: "notifications-mode",
+			label: "Notification mode",
+			description: "Desktop attention signals per turn",
+			currentValue: config.notificationMode,
+			values: ["off", "auto", "bell"],
+		});
+		items.splice(terminalProgressIndex + 4, 0, {
+			id: "notifications-notify-focused",
+			label: "Notify when focused",
+			description: "Notify even while the terminal is focused",
+			currentValue: config.notifyWhenFocused ? "true" : "false",
+			values: ["true", "false"],
+		});
+		items.splice(terminalProgressIndex + 5, 0, {
+			id: "fullscreen-mouse",
+			label: "Fullscreen mouse",
+			description: "Capture the mouse in fullscreen mode for app-owned scroll and selection",
+			currentValue: config.fullscreenMouse ? "true" : "false",
+			values: ["true", "false"],
+		});
 
 		// Add borders
 		this.addChild(new DynamicBorder());
@@ -960,6 +1009,21 @@ export class SettingsSelectorComponent extends Container {
 						break;
 					case "terminal-progress":
 						callbacks.onShowTerminalProgressChange(newValue === "true");
+						break;
+					case "terminal-animations":
+						callbacks.onAnimationsEnabledChange(newValue === "true");
+						break;
+					case "terminal-symbols":
+						callbacks.onSymbolPresetChange(newValue as "unicode" | "ascii");
+						break;
+					case "notifications-mode":
+						callbacks.onNotificationModeChange(newValue as "off" | "auto" | "bell");
+						break;
+					case "notifications-notify-focused":
+						callbacks.onNotifyWhenFocusedChange(newValue === "true");
+						break;
+					case "fullscreen-mouse":
+						callbacks.onFullscreenMouseChange(newValue === "true");
 						break;
 					case "tui-mode":
 						callbacks.onTuiModeChange(newValue as TuiMode);

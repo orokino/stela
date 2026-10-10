@@ -104,6 +104,9 @@ See [Compaction Reference](compaction.md) for trigger, summarization, and valida
 | `terminal.imageWidthCells` | number | `60` | Preferred inline image width in terminal cells. |
 | `terminal.clearOnShrink` | boolean | `false` | Clear empty rows when rendered content shrinks. |
 | `terminal.showTerminalProgress` | boolean | `false` | Show OSC 9;4 progress in the terminal tab. |
+| `terminal.animations` | boolean | `true` | Animate spinners and progress indicators. Off freezes them under `TERM=dumb` or without a TTY. |
+| `terminal.symbols` | `"unicode" \| "ascii"` | `"unicode"` | Glyph set for spinners, markers, and rules. `ascii` suits terminals without Unicode fonts. |
+| `fullscreenMouse` | boolean | `false` | Capture the mouse in fullscreen mode for app-owned scroll and selection. Off keeps terminal-native copy/paste. No effect in regular TUI mode. |
 | `terminal.hyperlinks` | `boolean \| "auto"` | `"auto"` | Override OSC 8 hyperlink detection. |
 | `terminal.images` | `"kitty" \| "iterm2" \| "auto" \| false` | `"auto"` | Override inline-image protocol detection. |
 | `terminal.trueColor` | `boolean \| "auto"` | `"auto"` | Override true-color detection. |
@@ -166,4 +169,12 @@ The built-in extensions are named `builtin:mcp`, `builtin:llama.cpp`, `builtin:c
 | `collapseChangelog` | boolean | `false` | Show a condensed changelog after an update. |
 | `enableInstallTelemetry` | boolean | `true` | Enable anonymous install/update reporting and selected provider attribution headers. Does not control update checks. |
 | `enableAnalytics` | boolean | `false` | Opt in to analytics data sharing. Currently used only by the experimental first-run setup. |
+| `telemetry.showExtendedTelemetry` | boolean | `false` | Show the extended footer telemetry suffix (token counts, cache hit rate, cost, files edited). Off keeps only the context segment. |
 | `warnings.anthropicExtraUsage` | boolean | `true` | Warn when Anthropic subscription authentication may use paid extra usage. |
+
+## Notifications
+
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `notifications.mode` | `"off" \| "auto" \| "bell"` | `"off"` | Desktop attention signals per turn. `auto` sends OSC 9 with BEL fallback; `bell` sends BEL only. |
+| `notifications.notifyWhenFocused` | boolean | `false` | Notify even while the terminal is focused. Default only notifies when unfocused. |

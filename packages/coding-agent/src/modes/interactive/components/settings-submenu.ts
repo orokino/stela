@@ -8,6 +8,8 @@ import {
 	SelectList,
 	type SelectListLayoutOptions,
 	Spacer,
+	selectListFooter,
+	selectListHeight,
 	Text,
 } from "@earendil-works/pi-tui";
 import { getSelectListTheme, theme } from "../theme/theme.ts";
@@ -22,6 +24,8 @@ export interface SelectSubmenuOptions {
 	searchable?: boolean;
 	/** Override the select list layout (column widths). */
 	layout?: SelectListLayoutOptions;
+	/** Terminal rows for the CC height clamp; falls back to 24. */
+	terminalRows?: number;
 }
 
 /**
@@ -33,6 +37,8 @@ export class SelectSubmenu extends Container {
 	private listChildIndex: number;
 	private allOptions: SelectItem[];
 	private listLayout: SelectListLayoutOptions;
+	private listMaxVisible: number;
+	private footerText: Text;
 	private searchInput: Input | undefined;
 	private onSelectCb: (value: string) => void;
 	private onCancelCb: () => void;
@@ -52,6 +58,9 @@ export class SelectSubmenu extends Container {
 
 		this.allOptions = options;
 		this.listLayout = submenuOptions?.layout ?? SUBMENU_SELECT_LIST_LAYOUT;
+		this.listMaxVisible = selectListHeight(
+			Number.isFinite(submenuOptions?.terminalRows) ? (submenuOptions?.terminalRows as number) : 24,
+		);
 		this.onSelectCb = onSelect;
 		this.onCancelCb = onCancel;
 		this.onSelectionChangeCb = onSelectionChange;
@@ -78,21 +87,26 @@ export class SelectSubmenu extends Container {
 		// Spacer
 		this.addChild(new Spacer(1));
 
-		// Select list
+		// Select list (CC clamp; search-on-overflow hides the input for small lists)
 		this.selectList = this.buildSelectList(options, currentValue);
 		this.listChildIndex = this.children.length;
 		this.addChild(this.selectList);
+		this.updateSearchVisibility(submenuOptions?.searchable ?? false);
 
-		// Hint
+		// Live-keybinding footer (OMP U9): segments from the live binding table.
 		this.addChild(new Spacer(1));
-		const hint = submenuOptions?.searchable
-			? "  Type to filter \u00b7 Enter to select \u00b7 Esc to go back"
-			: "  Enter to select \u00b7 Esc to go back";
-		this.addChild(new Text(theme.fg("dim", hint), 0, 0));
+		this.footerText = new Text("", 0, 0);
+		this.addChild(this.footerText);
+		this.updateFooter(submenuOptions?.searchable ?? false);
 	}
 
 	private buildSelectList(options: SelectItem[], preselect: string): SelectList {
-		const list = new SelectList(options, Math.min(options.length, 10), getSelectListTheme(), this.listLayout);
+		const list = new SelectList(
+			options,
+			Math.min(options.length, this.listMaxVisible),
+			getSelectListTheme(),
+			this.listLayout,
+		);
 
 		const idx = options.findIndex((o) => o.value === preselect);
 		if (idx !== -1) list.setSelectedIndex(idx);
@@ -115,6 +129,29 @@ export class SelectSubmenu extends Container {
 		const newList = this.buildSelectList(filtered, "");
 		this.children[this.listChildIndex] = newList;
 		this.selectList = newList;
+	}
+	private searchable = false;
+
+	private updateSearchVisibility(searchable: boolean): void {
+		this.searchable = searchable;
+		if (!searchable || !this.searchInput) return;
+		// Search-on-overflow (OMP U9): drop the filter row when everything fits.
+		if (this.allOptions.length <= this.listMaxVisible) this.searchInput.setValue("");
+	}
+
+	private updateFooter(searchable: boolean): void {
+		const kb = getKeybindings();
+		const segments = searchable
+			? [
+					`${kb.getKeys("tui.select.confirm").join("/")} select`,
+					`${kb.getKeys("tui.select.cancel").join("/")} go back`,
+					"type to filter",
+				]
+			: [
+					`${kb.getKeys("tui.select.confirm").join("/")} select`,
+					`${kb.getKeys("tui.select.cancel").join("/")} go back`,
+				];
+		this.footerText.setText(theme.fg("dim", `  ${selectListFooter(segments)}`));
 	}
 
 	handleInput(data: string): void {

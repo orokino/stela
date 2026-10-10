@@ -80,6 +80,7 @@ export {
 	type SelectListTruncatePrimaryContext,
 	type SymbolPreset,
 	selectCurrentMark,
+	selectListFooter,
 	selectListHeight,
 	selectListOverflow,
 	selectMarker,

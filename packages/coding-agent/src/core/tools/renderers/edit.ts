@@ -123,22 +123,6 @@ function formatEditResult(
 
 	return undefined;
 }
-function getEditHeaderBg(
-	preview: EditPreview | undefined,
-	settledError: boolean | undefined,
-	theme: Theme,
-): (text: string) => string {
-	if (preview) {
-		if ("error" in preview) {
-			return (text: string) => theme.bg("toolErrorBg", text);
-		}
-		return (text: string) => theme.bg("toolSuccessBg", text);
-	}
-	if (settledError) {
-		return (text: string) => theme.bg("toolErrorBg", text);
-	}
-	return (text: string) => theme.bg("toolPendingBg", text);
-}
 function buildEditCallComponent(
 	component: EditCallRenderComponent,
 	args: RenderableEditArgs | undefined,
@@ -148,7 +132,9 @@ function buildEditCallComponent(
 	status: "running" | "ok" | "error",
 	meta?: string,
 ): EditCallRenderComponent {
-	component.setBgFn(getEditHeaderBg(component.preview, component.settledError, theme));
+	// S6 unboxed row: identity bg (no tint — the head glyph + words carry the
+	// state); paddingX stays the spec's indented body.
+	component.setBgFn((text: string) => text);
 	component.setPaddingX(outputPad);
 	component.clear();
 	component.addChild(new Text(formatEditCall(args, theme, cwd, status, meta), 0, 0));

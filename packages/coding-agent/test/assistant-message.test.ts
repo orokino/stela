@@ -92,7 +92,8 @@ describe("AssistantMessageComponent", () => {
 		);
 		const rendered = stripAnsi(component.render(80).join("\n"));
 
-		expect(rendered.match(/\+ Thought · 3s/g)).toHaveLength(1);
+		expect(rendered.match(/\+ Thought · 3s · 2 lines · /g)).toHaveLength(1);
+		expect(rendered).toContain("to expand");
 		expect(rendered).toContain("answer");
 	});
 
@@ -111,7 +112,7 @@ describe("AssistantMessageComponent", () => {
 		vi.useFakeTimers();
 		try {
 			const component = new AssistantMessageComponent(undefined, true);
-			component.setThinkingStartedAt(performance.now());
+			component.setThinkingStartedAt(performance.now() - 2100);
 			component.updateContent(createAssistantMessage([{ type: "thinking", thinking: "" }]), true);
 			vi.advanceTimersByTime(2100);
 			const rendered = stripAnsi(component.render(80).join("\n"));
@@ -154,7 +155,31 @@ describe("AssistantMessageComponent", () => {
 		const collapsed = stripAnsi(component.render(width).join("\n"));
 		expect(collapsed).not.toContain("first reasoning");
 		expect(collapsed).toContain("+ Thought");
+		expect(collapsed).toContain("to expand");
 		expect(collapsed).toContain("second reasoning");
+	});
+
+	test("ends finished text-only turns with a model-free duration and tok/s meta line", () => {
+		initTheme("dark");
+		const message = createAssistantMessage([{ type: "text", text: "hello from script" }], {
+			durationMs: 3600,
+		});
+		message.usage = { ...message.usage, output: 20, totalTokens: 27 };
+		const component = new AssistantMessageComponent(message, false);
+		const rendered = stripAnsi(component.render(80).join("\n"));
+		expect(rendered).toContain("3.6s · 7.5 tok/s");
+		expect(rendered).not.toContain("gpt-4o-mini");
+	});
+
+	test("renders aborts as a muted interrupted tail, never red", () => {
+		initTheme("dark");
+		const component = new AssistantMessageComponent(
+			createAssistantMessage([{ type: "text", text: "partial" }], { stopReason: "aborted" }),
+			false,
+		);
+		const raw = component.render(80).join("\n");
+		expect(stripAnsi(raw)).toContain("· interrupted");
+		expect(raw).not.toContain("\x1b[31m");
 	});
 
 	test("uses configured output padding for text and thinking", () => {

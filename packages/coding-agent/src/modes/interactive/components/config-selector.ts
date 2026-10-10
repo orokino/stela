@@ -12,6 +12,7 @@ import {
 	Input,
 	matchesKey,
 	Spacer,
+	selectListHeight,
 	truncateToWidth,
 	visibleWidth,
 } from "@earendil-works/pi-tui";
@@ -267,9 +268,9 @@ class ResourceList implements Component, Focusable {
 		this.writeScope = writeScope;
 		this.inheritedEnabledByKey = this.buildInheritedEnabledMap(groupsByScope.global);
 		this.searchInput = new Input();
-		// 8 lines of chrome: top spacer + top border + spacer + header (2 lines) + spacer + bottom spacer + bottom border
-		const chrome = 8;
-		this.maxVisible = Math.max(5, (terminalHeight ?? 24) - chrome);
+		// Same-family clamp (CC U9): half the screen like every other picker.
+		// The standalone CLI passes terminalHeight; inline callers pass rows.
+		this.maxVisible = selectListHeight(Number.isFinite(terminalHeight) ? (terminalHeight as number) : 24);
 		this.buildFlatList();
 		this.filteredItems = [...this.flatItems];
 	}

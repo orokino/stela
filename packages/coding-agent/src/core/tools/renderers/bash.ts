@@ -18,6 +18,32 @@ import { TRUNCATION_TABLE } from "../truncation-table.ts";
 
 const BASH_PREVIEW_LINES = TRUNCATION_TABLE.outputCollapsed;
 export const BASH_UPDATE_THROTTLE_MS = 100;
+export const BASH_LIVE_TICK_MS = 100;
+/**
+ * Signal number to name for 128+N shell exit codes (S6: `exit N (signal)` status
+ * words). Only the signals a shell plausibly reports; unknown numbers render as
+ * bare `exit N` so the head never claims a precision the wait status lacks.
+ */
+export function signalNameForExitCode(exitCode: number): string | undefined {
+	const signals: Record<number, string> = {
+		1: "SIGHUP",
+		2: "SIGINT",
+		3: "SIGQUIT",
+		4: "SIGILL",
+		5: "SIGTRAP",
+		6: "SIGABRT",
+		7: "SIGBUS",
+		8: "SIGFPE",
+		9: "SIGKILL",
+		10: "SIGUSR1",
+		11: "SIGSEGV",
+		12: "SIGUSR2",
+		13: "SIGPIPE",
+		14: "SIGALRM",
+		15: "SIGTERM",
+	};
+	return exitCode > 128 && exitCode <= 128 + 15 ? signals[exitCode - 128] : undefined;
+}
 function formatDuration(ms: number): string {
 	const seconds = ms / 1000;
 	if (seconds < 60) return `${seconds.toFixed(1)}s`;
@@ -100,6 +126,9 @@ function rebuildBashResultRenderComponent(
 			warnings.push(`Full output: ${fullOutputPath}`);
 		}
 		if (truncation?.truncated) {
+			// S6 explicit tails on STELA's TRUNCATION_TABLE numbers: the fence is the
+			// status glyph PLUS the words (never colour alone), and the numbers name the
+			// surface budget the output actually hit.
 			if (truncation.truncatedBy === "lines") {
 				warnings.push(`Truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines`);
 			} else {
@@ -135,7 +164,10 @@ export function createShellRenderers(prompt: string): Pick<ToolDefinition<any, a
 			const status = toolHeadStatus(context);
 			const details = context.resultDetails as BashToolDetails | undefined;
 			const metaParts: string[] = [];
-			if (details?.exitCode !== undefined && details.exitCode !== 0) metaParts.push(`exit ${details.exitCode}`);
+			if (details?.exitCode !== undefined && details.exitCode !== 0) {
+				const signal = signalNameForExitCode(details.exitCode);
+				metaParts.push(signal ? `exit ${details.exitCode} (${signal})` : `exit ${details.exitCode}`);
+			}
 			const durationMs =
 				context.durationMs ??
 				(state.startedAt !== undefined && state.endedAt !== undefined
@@ -155,8 +187,9 @@ export function createShellRenderers(prompt: string): Pick<ToolDefinition<any, a
 		},
 		renderResult(result, options, _theme, context) {
 			const state = context.state;
+			// S6 live 100 ms elapsed timer while the shell runs.
 			if (state.startedAt !== undefined && options.isPartial && !state.interval) {
-				state.interval = setInterval(() => context.invalidate(), 1000);
+				state.interval = setInterval(() => context.invalidate(), BASH_LIVE_TICK_MS);
 			}
 			if (!options.isPartial || context.isError) {
 				state.endedAt ??= Date.now();

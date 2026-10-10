@@ -16,6 +16,17 @@ export function shortenPath(path: unknown): string {
 	return path;
 }
 
+/**
+ * S6 truncate-start: keep the tail (filename) visible when a path overflows its
+ * budget, cutting from the front with an ellipsis. ASCII falls back to `...`.
+ */
+export function truncatePathStart(path: string, maxChars: number): string {
+	if (maxChars <= 0) return path;
+	if (path.length <= maxChars) return path;
+	const ellipsis = pickSymbol("…", "...");
+	return `${ellipsis}${path.slice(path.length - (maxChars - ellipsis.length))}`;
+}
+
 export function linkPath(styledText: string, rawPath: string, cwd: string): string {
 	if (!getCapabilities().hyperlinks) return styledText;
 	const absolutePath = resolvePath(rawPath, cwd);
@@ -148,10 +159,12 @@ export function renderToolPath(
 	rawPath: string | null,
 	theme: Theme,
 	cwd: string,
-	options?: { emptyFallback?: string },
+	options?: { emptyFallback?: string; maxChars?: number },
 ): string {
 	if (rawPath === null) return invalidArgText(theme);
 	const value = rawPath || options?.emptyFallback;
 	if (!value) return theme.fg("toolOutput", "...");
-	return linkPath(theme.fg("accent", shortenPath(value)), value, cwd);
+	const shortened = shortenPath(value);
+	const display = options?.maxChars !== undefined ? truncatePathStart(shortened, options.maxChars) : shortened;
+	return linkPath(theme.fg("accent", display), value, cwd);
 }

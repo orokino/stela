@@ -90,6 +90,11 @@ export class ProgramStatusReporter {
 		this.report();
 	}
 
+	/** Whether any dialog currently waits for the user (drives the title Action Required word). */
+	hasBlocked(): boolean {
+		return this.blocked.size > 0;
+	}
+
 	/** Forget the previous session's run, for example after switching sessions. */
 	reset(): void {
 		this.runActive = false;

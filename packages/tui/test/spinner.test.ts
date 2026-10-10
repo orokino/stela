@@ -22,12 +22,24 @@ describe("spinner presets and suppression", () => {
 		assert.deepStrictEqual(SPINNER_PRESETS.unicode.frames, ["⠈⠞", "⠠⠜", "⠰⠰", "⠘⠤", "⠘⠆", "⠘⠣", "⠰⠳", "⠠⠛"]);
 		assert.strictEqual(SPINNER_PRESETS.unicode.intervalMs, 250);
 		assert.deepStrictEqual(SPINNER_PRESETS.ascii.frames, ["|", "/", "-", "\\"]);
+		assert.ok(!("nerd" in SPINNER_PRESETS));
 	});
 
 	it("renders the ascii preset frame in the indicator", () => {
 		const loader = new Loader(silentTui, identity, identity, "Working", { preset: "ascii" });
 		try {
 			assert.ok(loader.render(40).join("\n").includes("| Working"));
+		} finally {
+			loader.stop();
+		}
+	});
+
+	it("falls back to unicode frames for the deleted nerd preset", () => {
+		const loader = new Loader(silentTui, identity, identity, "Working", {
+			preset: "nerd" as "unicode",
+		});
+		try {
+			assert.ok(loader.render(40).join("\n").includes("⠈⠞ Working"));
 		} finally {
 			loader.stop();
 		}

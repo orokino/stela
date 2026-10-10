@@ -11,6 +11,7 @@ import {
 	SELECT_MARKER,
 	SELECT_SEARCH_PLACEHOLDER,
 	Spacer,
+	selectListHeight,
 	selectListOverflow,
 	Text,
 	truncateToWidth,
@@ -311,7 +312,7 @@ class SessionList implements Component, Focusable {
 	public onDeleteSession?: (sessionPath: string) => Promise<void>;
 	public onRenameSession?: (sessionPath: string) => void;
 	public onError?: (message: string) => void;
-	private maxVisible: number = 10; // Max sessions visible (one line each)
+	private maxVisible: number;
 
 	// Focusable implementation - propagate to searchInput for IME cursor positioning
 	private _focused = false;
@@ -330,7 +331,9 @@ class SessionList implements Component, Focusable {
 		nameFilter: NameFilter,
 		keybindings: KeybindingsManager,
 		currentSessionFilePath?: string,
+		terminalRows?: number,
 	) {
+		this.maxVisible = selectListHeight(Number.isFinite(terminalRows) ? (terminalRows as number) : 24);
 		this.allSessions = sessions;
 		this.filteredSessions = [];
 		this.searchInput = new Input({ placeholder: SELECT_SEARCH_PLACEHOLDER });
@@ -425,9 +428,12 @@ class SessionList implements Component, Focusable {
 	render(width: number): string[] {
 		const lines: string[] = [];
 
-		// Render search input
-		lines.push(...this.searchInput.render(width));
-		lines.push(""); // Blank line after search
+		// Search-on-overflow (OMP U9): the search row only shows when the list
+		// exceeds the visible budget. Small lists stay clean.
+		if (this.filteredSessions.length > this.maxVisible) {
+			lines.push(...this.searchInput.render(width));
+			lines.push(""); // Blank line after search
+		}
 
 		if (this.filteredSessions.length === 0) {
 			let emptyMessage: string;
@@ -769,6 +775,7 @@ export class SessionSelectorComponent extends Container implements Focusable {
 			keybindings?: KeybindingsManager;
 		},
 		currentSessionFilePath?: string,
+		terminalRows?: number,
 	) {
 		super();
 		this.keybindings = options?.keybindings ?? KeybindingsManager.create();
@@ -781,7 +788,7 @@ export class SessionSelectorComponent extends Container implements Focusable {
 		this.canRename = !!renameSession;
 		this.header.setShowRenameHint(options?.showRenameHint ?? this.canRename);
 
-		// Create session list (starts empty, will be populated after load)
+		// Create session list (starts empty, will be populated after load; CC clamp)
 		this.sessionList = new SessionList(
 			[],
 			false,
@@ -789,6 +796,7 @@ export class SessionSelectorComponent extends Container implements Focusable {
 			this.nameFilter,
 			this.keybindings,
 			currentSessionFilePath,
+			terminalRows,
 		);
 
 		this.buildBaseLayout(this.sessionList);

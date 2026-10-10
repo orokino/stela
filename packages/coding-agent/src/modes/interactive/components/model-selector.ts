@@ -8,6 +8,8 @@ import {
 	SELECT_MARKER,
 	SELECT_SEARCH_PLACEHOLDER,
 	Spacer,
+	selectListFooter,
+	selectListHeight,
 	selectListOverflow,
 	Text,
 	type TUI,
@@ -72,6 +74,9 @@ export class ModelSelectorComponent extends Container implements Focusable {
 	private scope: ModelScope = "all";
 	private scopeText?: Text;
 	private scopeHintText?: Text;
+	private searchContainer?: Container;
+	private footerContainer?: Container;
+	private maxVisible: number;
 	private readonly refreshAbortController = new AbortController();
 	private refreshTimeout?: ReturnType<typeof setTimeout>;
 	private closed = false;
@@ -86,8 +91,10 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		initialSearchInput?: string,
 		onSelectAsDefault?: (model: Model<any>) => void,
 		defaultModel?: DefaultModelReference,
+		terminalRows?: number,
 	) {
 		super();
+		this.maxVisible = selectListHeight(Number.isFinite(terminalRows) ? (terminalRows as number) : 24);
 
 		this.tui = tui;
 		this.currentModel = currentModel;
@@ -115,7 +122,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		}
 		this.addChild(new Spacer(1));
 
-		// Create search input
+		// Create search input (search-on-overflow: container hides it for small lists)
 		this.searchInput = new Input({ placeholder: SELECT_SEARCH_PLACEHOLDER });
 		if (initialSearchInput) {
 			this.searchInput.setValue(initialSearchInput);
@@ -126,9 +133,10 @@ export class ModelSelectorComponent extends Container implements Focusable {
 				this.handleSelect(this.filteredModels[this.selectedIndex].model);
 			}
 		};
-		this.addChild(this.searchInput);
-
-		this.addChild(new Spacer(1));
+		this.searchContainer = new Container();
+		this.searchContainer.addChild(this.searchInput);
+		this.searchContainer.addChild(new Spacer(1));
+		this.addChild(this.searchContainer);
 
 		// Create list container
 		this.listContainer = new Container();
@@ -136,19 +144,10 @@ export class ModelSelectorComponent extends Container implements Focusable {
 
 		this.addChild(new Spacer(1));
 
-		// Hint
-		if (this.onSelectAsDefaultCallback) {
-			this.addChild(
-				new Text(
-					theme.fg(
-						"dim",
-						`  ${keyDisplayText("tui.select.confirm")} to select · ${keyDisplayText("app.models.save")} to set as default · ${keyDisplayText("tui.select.cancel")} to cancel`,
-					),
-					0,
-					0,
-				),
-			);
-		}
+		// Live-keybinding footer (OMP U9): segments composed from the live table.
+		this.footerContainer = new Container();
+		this.addChild(this.footerContainer);
+		this.updateFooter();
 
 		// Add bottom border
 		this.addChild(new DynamicBorder());
@@ -258,6 +257,27 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		return keyHint("tui.input.tab", "scope") + theme.fg("muted", " (all/scoped)");
 	}
 
+	private updateSearchVisibility(): void {
+		if (!this.searchContainer) return;
+		const show = this.activeModels.length > this.maxVisible || this.searchInput.getValue().length > 0;
+		this.searchContainer.clear();
+		if (show) {
+			this.searchContainer.addChild(this.searchInput);
+			this.searchContainer.addChild(new Spacer(1));
+		}
+	}
+
+	private updateFooter(): void {
+		if (!this.footerContainer) return;
+		this.footerContainer.clear();
+		const segments = [
+			this.onSelectAsDefaultCallback
+				? `${keyDisplayText("tui.select.confirm")} to select · ${keyDisplayText("app.models.save")} to set as default · ${keyDisplayText("tui.select.cancel")} to cancel`
+				: `${keyDisplayText("tui.select.confirm")} to select · ${keyDisplayText("tui.select.cancel")} to cancel`,
+		];
+		this.footerContainer.addChild(new Text(theme.fg("dim", `  ${selectListFooter(segments)}`), 0, 0));
+	}
+
 	private isDefaultModel(model: Model<any>): boolean {
 		return this.defaultModel?.provider === model.provider && this.defaultModel.id === model.id;
 	}
@@ -308,12 +328,14 @@ export class ModelSelectorComponent extends Container implements Focusable {
 	private updateList(): void {
 		this.listContainer.clear();
 
-		const maxVisible = 10;
+		const maxVisible = this.maxVisible;
 		const startIndex = Math.max(
 			0,
 			Math.min(this.selectedIndex - Math.floor(maxVisible / 2), this.filteredModels.length - maxVisible),
 		);
 		const endIndex = Math.min(startIndex + maxVisible, this.filteredModels.length);
+		this.updateSearchVisibility();
+		this.updateFooter();
 
 		// Show visible slice of filtered models
 		for (let i = startIndex; i < endIndex; i++) {

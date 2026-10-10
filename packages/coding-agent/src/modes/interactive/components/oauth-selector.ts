@@ -8,6 +8,8 @@ import {
 	SELECT_MARKER,
 	SELECT_SEARCH_PLACEHOLDER,
 	Spacer,
+	selectListFooter,
+	selectListHeight,
 	selectListOverflow,
 	TruncatedText,
 } from "@earendil-works/pi-tui";
@@ -72,10 +74,13 @@ export class OAuthSelectorComponent extends Container implements Focusable {
 	}
 
 	private listContainer: Container;
+	private searchContainer: Container | undefined;
+	private footerText: TruncatedText | undefined;
 	private allProviders: AuthSelectorProvider[];
 	private filteredProviders: AuthSelectorProvider[];
 	private selectedIndex: number = 0;
 	private mode: "login" | "logout";
+	private maxVisible: number;
 	private onSelectCallback: (providerId: string, authType: AuthSelectorProvider["authType"]) => void;
 	private onCancelCallback: () => void;
 	private showAuthTypeLabels: boolean;
@@ -86,8 +91,10 @@ export class OAuthSelectorComponent extends Container implements Focusable {
 		onSelect: (providerId: string, authType: AuthSelectorProvider["authType"]) => void,
 		onCancel: () => void,
 		initialSearchInput?: string,
+		terminalRows?: number,
 	) {
 		super();
+		this.maxVisible = selectListHeight(Number.isFinite(terminalRows) ? (terminalRows as number) : 24);
 
 		this.mode = mode;
 		this.allProviders = providers;
@@ -115,14 +122,17 @@ export class OAuthSelectorComponent extends Container implements Focusable {
 				this.onSelectCallback(selectedProvider.id, selectedProvider.authType);
 			}
 		};
-		this.addChild(this.searchInput);
-		this.addChild(new Spacer(1));
+		this.searchContainer = new Container();
+		this.searchContainer.addChild(this.searchInput);
+		this.searchContainer.addChild(new Spacer(1));
+		this.addChild(this.searchContainer);
 
 		// Create list container
 		this.listContainer = new Container();
 		this.addChild(this.listContainer);
 
 		this.addChild(new Spacer(1));
+		this.updateFooter();
 
 		// Add bottom border
 		this.addChild(new DynamicBorder());
@@ -145,8 +155,9 @@ export class OAuthSelectorComponent extends Container implements Focusable {
 
 	private updateList(): void {
 		this.listContainer.clear();
+		this.updateSearchVisibility();
 
-		const maxVisible = 8;
+		const maxVisible = this.maxVisible;
 		const startIndex = Math.max(
 			0,
 			Math.min(this.selectedIndex - Math.floor(maxVisible / 2), this.filteredProviders.length - maxVisible),
@@ -191,6 +202,27 @@ export class OAuthSelectorComponent extends Container implements Focusable {
 					: "No matching providers";
 			this.listContainer.addChild(new TruncatedText(theme.fg("muted", `  ${message}`), 1, 0));
 		}
+	}
+	private updateSearchVisibility(): void {
+		if (!this.searchContainer) return;
+		const show = this.allProviders.length > this.maxVisible || this.searchInput.getValue().length > 0;
+		this.searchContainer.clear();
+		if (show) {
+			this.searchContainer.addChild(this.searchInput);
+			this.searchContainer.addChild(new Spacer(1));
+		}
+	}
+
+	private updateFooter(): void {
+		const kb = getKeybindings();
+		const footer = selectListFooter([
+			`${kb.getKeys("tui.select.confirm").join("/")} select`,
+			`${kb.getKeys("tui.select.cancel").join("/")} close`,
+		]);
+		const text = theme.fg("dim", `  ${footer}`);
+		if (this.footerText) this.footerText.setText(text);
+		else this.footerText = new TruncatedText(text, 1, 0);
+		if (!this.children.includes(this.footerText)) this.addChild(this.footerText);
 	}
 
 	handleInput(keyData: string): void {

@@ -20,6 +20,7 @@ import {
 	getWordSegmenter,
 	isWhitespaceChar,
 	sliceByColumn,
+	truncateToWidth,
 	visibleWidth,
 } from "../utils.ts";
 import { findWordBackward, findWordForward } from "../word-navigation.ts";
@@ -243,6 +244,12 @@ export interface EditorTheme {
 export interface EditorOptions {
 	paddingX?: number;
 	autocompleteMaxVisible?: number;
+	/** Render a gutter marker before the first content line (composer caret). */
+	gutterSymbol?: string;
+	/** Placeholder shown when the draft is empty. */
+	placeholder?: string;
+	/** Status text embedded at the right of the bottom border (composer model/mode). */
+	bottomStatusText?: () => string | undefined;
 }
 
 const SLASH_COMMAND_SELECT_LIST_LAYOUT: SelectListLayoutOptions = {
@@ -307,6 +314,9 @@ export class Editor implements Component, Focusable {
 	protected tui: TUI;
 	private theme: EditorTheme;
 	private paddingX: number = 0;
+	private gutterSymbol: string | undefined;
+	private placeholder: string | undefined;
+	private bottomStatusText: (() => string | undefined) | undefined;
 
 	// Store last render geometry for cursor navigation and mouse hit-testing.
 	private lastWidth: number = 80;
@@ -382,6 +392,9 @@ export class Editor implements Component, Focusable {
 		this.paddingX = Number.isFinite(paddingX) ? Math.max(0, Math.floor(paddingX)) : 0;
 		const maxVisible = options.autocompleteMaxVisible ?? 5;
 		this.autocompleteMaxVisible = Number.isFinite(maxVisible) ? Math.max(3, Math.min(20, Math.floor(maxVisible))) : 5;
+		this.gutterSymbol = options.gutterSymbol;
+		this.placeholder = options.placeholder;
+		this.bottomStatusText = options.bottomStatusText;
 	}
 
 	/** Set of currently valid paste IDs, for marker-aware segmentation. */
@@ -396,6 +409,27 @@ export class Editor implements Component, Focusable {
 
 	getPaddingX(): number {
 		return this.paddingX;
+	}
+
+	setGutterSymbol(symbol: string | undefined): void {
+		if (this.gutterSymbol !== symbol) {
+			this.gutterSymbol = symbol;
+			this.tui.requestRender();
+		}
+	}
+
+	setPlaceholder(placeholder: string | undefined): void {
+		if (this.placeholder !== placeholder) {
+			this.placeholder = placeholder;
+			this.tui.requestRender();
+		}
+	}
+
+	setBottomStatusText(provider: (() => string | undefined) | undefined): void {
+		if (this.bottomStatusText !== provider) {
+			this.bottomStatusText = provider;
+			this.tui.requestRender();
+		}
 	}
 
 	setPaddingX(padding: number): void {
@@ -579,8 +613,18 @@ export class Editor implements Component, Focusable {
 	}
 
 	protected renderBottomBorder(width: number, hiddenLineCount: number): string {
-		const border = hiddenLineCount > 0 ? createScrollBorder("↓", hiddenLineCount, width) : "─".repeat(width);
-		return this.borderColor(border);
+		const status = this.bottomStatusText?.();
+		if (!status || width <= 0) {
+			const border = hiddenLineCount > 0 ? createScrollBorder("↓", hiddenLineCount, width) : "─".repeat(width);
+			return this.borderColor(border);
+		}
+		// Composer status (model + thinking + mode) owns the right end of the bottom
+		// border; hidden-line scroll state keeps the left end.
+		const leader = "─".repeat(3);
+		const middle = " ";
+		const label = status.length > width - leader.length - middle.length ? status.slice(0, width) : status;
+		const dashes = Math.max(0, width - leader.length - middle.length - visibleWidth(label));
+		return this.borderColor(`${leader}${"─".repeat(dashes)}${middle}${label}`);
 	}
 
 	render(width: number): string[] {
@@ -634,10 +678,29 @@ export class Editor implements Component, Focusable {
 		// autocomplete (e.g. slash-command menu) is visible.
 		const emitCursorMarker = this.focused;
 
-		for (const layoutLine of visibleLines) {
+		for (const [index, layoutLine] of visibleLines.entries()) {
 			let displayText = layoutLine.text;
 			let lineVisibleWidth = visibleWidth(layoutLine.text);
 			let cursorInPadding = false;
+
+			// Empty draft: show the placeholder instead of a bare cursor cell.
+			const isEmptyDraft = this.getText().length === 0 && lineVisibleWidth === 0;
+			if (isEmptyDraft && this.placeholder) {
+				displayText = this.placeholder;
+				lineVisibleWidth = visibleWidth(displayText);
+			}
+
+			// Composer gutter: caret before the first content line only. The gutter
+			// eats into the content width; over-wide pre-cursor text (e.g. the
+			// placeholder at 40 cols) is truncated here so the fake cursor added
+			// below is never clipped.
+			const gutter = index === 0 && this.gutterSymbol ? `${this.gutterSymbol} ` : "";
+			const gutterWidth = visibleWidth(gutter);
+			const textBudget = Math.max(0, contentWidth - gutterWidth);
+			if (lineVisibleWidth > textBudget) {
+				displayText = truncateToWidth(displayText, textBudget, "");
+				lineVisibleWidth = textBudget;
+			}
 
 			// Add cursor if this line has it
 			if (layoutLine.hasCursor && layoutLine.cursorPos !== undefined) {
@@ -668,12 +731,11 @@ export class Editor implements Component, Focusable {
 				}
 			}
 
-			// Calculate padding based on actual visible width
-			const padding = " ".repeat(Math.max(0, contentWidth - lineVisibleWidth));
+			// Calculate padding based on actual visible width (gutter already budgeted above).
+			const padding = " ".repeat(Math.max(0, contentWidth - gutterWidth - lineVisibleWidth));
 			const lineRightPadding = cursorInPadding ? rightPadding.slice(1) : rightPadding;
-
 			// Render the line (no side borders, just horizontal lines above and below)
-			result.push(`${leftPadding}${displayText}${padding}${lineRightPadding}`);
+			result.push(`${leftPadding}${gutter}${displayText}${padding}${lineRightPadding}`);
 		}
 
 		// Render bottom border (with scroll indicator if more content below)
@@ -1185,6 +1247,40 @@ export class Editor implements Component, Focusable {
 	 */
 	getExpandedText(): string {
 		return this.expandPasteMarkers(this.state.lines.join("\n"));
+	}
+
+	/** Whether any collapsed paste marker is still in the draft. */
+	hasCollapsedPastes(): boolean {
+		if (this.pastes.size === 0) return false;
+		return PASTE_MARKER_REGEX.test(this.state.lines.join("\n"));
+	}
+
+	/**
+	 * Re-expand the most recent collapsed paste marker in place (OMP U7 manual
+	 * re-expand). Returns true when a marker was expanded.
+	 */
+	expandMostRecentPaste(): boolean {
+		if (this.pastes.size === 0) return false;
+		const text = this.state.lines.join("\n");
+		PASTE_MARKER_REGEX.lastIndex = 0;
+		let lastId: number | undefined;
+		for (const match of text.matchAll(PASTE_MARKER_REGEX)) {
+			const id = Number.parseInt(match[1]!, 10);
+			if (this.pastes.has(id)) lastId = id;
+		}
+		if (lastId === undefined) return false;
+		const content = this.pastes.get(lastId)!;
+		this.pushUndoSnapshot();
+		this.lastAction = null;
+		this.exitHistoryBrowsing();
+		const markerRegex = new RegExp(`\\[Pasted #${lastId}( (\\(\\+\\d+ lines\\)|\\d+ chars))?\\]`);
+		const expanded = text.replace(markerRegex, () => content);
+		this.state.lines = expanded.split("\n");
+		this.state.cursorLine = Math.min(this.state.cursorLine, this.state.lines.length - 1);
+		this.setCursorCol(0);
+		this.pastes.delete(lastId);
+		if (this.onChange) this.onChange(this.getText());
+		return true;
 	}
 
 	getLines(): string[] {

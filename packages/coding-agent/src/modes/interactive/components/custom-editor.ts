@@ -134,6 +134,12 @@ export class CustomEditor extends Editor {
 			return;
 		}
 
+		// Manual paste re-expand (OMP U7): expand the most recent collapsed paste
+		// marker in place. Runs before the generic action loop so it works even
+		// when no handler was registered for an empty registry.
+		if (this.keybindings.matches(data, "app.editor.pasteExpand") && this.expandMostRecentPaste()) {
+			return;
+		}
 		// Check all other app actions
 		for (const [action, handler] of this.actionHandlers) {
 			if (action !== "app.interrupt" && action !== "app.exit" && this.keybindings.matches(data, action)) {

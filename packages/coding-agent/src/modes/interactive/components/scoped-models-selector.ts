@@ -10,6 +10,8 @@ import {
 	SELECT_MARKER,
 	SELECT_SEARCH_PLACEHOLDER,
 	Spacer,
+	selectListFooter,
+	selectListHeight,
 	selectListOverflow,
 	Text,
 } from "@earendil-works/pi-tui";
@@ -115,15 +117,17 @@ export class ScopedModelsSelectorComponent extends Container implements Focusabl
 		this.searchInput.focused = value;
 	}
 	private listContainer: Container;
+	private searchContainer: Container | undefined;
 	private footerText: Text;
 	private callbacks: ModelsCallbacks;
-	private maxVisible = 8;
+	private maxVisible: number;
 	private isDirty = false;
 	private refreshStatusText?: Text;
 
-	constructor(config: ModelsConfig, callbacks: ModelsCallbacks) {
+	constructor(config: ModelsConfig, callbacks: ModelsCallbacks, terminalRows?: number) {
 		super();
 		this.callbacks = callbacks;
+		this.maxVisible = selectListHeight(Number.isFinite(terminalRows) ? (terminalRows as number) : 24);
 
 		for (const model of config.allModels) {
 			const fullId = `${model.provider}/${model.id}`;
@@ -143,10 +147,12 @@ export class ScopedModelsSelectorComponent extends Container implements Focusabl
 		);
 		this.addChild(new Spacer(1));
 
-		// Search input
+		// Search input (search-on-overflow: hidden for small lists)
 		this.searchInput = new Input({ placeholder: SELECT_SEARCH_PLACEHOLDER });
-		this.addChild(this.searchInput);
-		this.addChild(new Spacer(1));
+		this.searchContainer = new Container();
+		this.searchContainer.addChild(this.searchInput);
+		this.searchContainer.addChild(new Spacer(1));
+		this.addChild(this.searchContainer);
 
 		// List container
 		this.listContainer = new Container();
@@ -202,7 +208,7 @@ export class ScopedModelsSelectorComponent extends Container implements Focusabl
 		const countText = allEnabled
 			? "all enabled"
 			: `${enabledCount}/${this.allIds.length} enabled${unavailableCount ? ` · ${unavailableCount} unavailable` : ""}`;
-		const parts = [
+		const joined = selectListFooter([
 			`${keyDisplayText("tui.select.confirm")} toggle`,
 			`${keyDisplayText("app.models.enableAll")} all`,
 			`${keyDisplayText("app.models.clearAll")} clear`,
@@ -210,10 +216,10 @@ export class ScopedModelsSelectorComponent extends Container implements Focusabl
 			`${keyDisplayText("app.models.reorderUp")}/${keyDisplayText("app.models.reorderDown")} reorder`,
 			`${keyDisplayText("app.models.save")} save`,
 			countText,
-		];
+		]);
 		return this.isDirty
-			? theme.fg("dim", `  ${parts.join(" · ")} `) + theme.fg("warning", "(unsaved)")
-			: theme.fg("dim", `  ${parts.join(" · ")}`);
+			? theme.fg("dim", `  ${joined} `) + theme.fg("warning", "(unsaved)")
+			: theme.fg("dim", `  ${joined}`);
 	}
 
 	private refresh(): void {
@@ -235,8 +241,19 @@ export class ScopedModelsSelectorComponent extends Container implements Focusabl
 		this.callbacks.onChange(this.enabledIds === null ? null : [...this.enabledIds]);
 	}
 
+	private updateSearchVisibility(): void {
+		if (!this.searchContainer) return;
+		const show = this.buildItems().length > this.maxVisible || this.searchInput.getValue().length > 0;
+		this.searchContainer.clear();
+		if (show) {
+			this.searchContainer.addChild(this.searchInput);
+			this.searchContainer.addChild(new Spacer(1));
+		}
+	}
+
 	private updateList(): void {
 		this.listContainer.clear();
+		this.updateSearchVisibility();
 
 		if (this.filteredItems.length === 0) {
 			this.listContainer.addChild(new Text(theme.fg("muted", "  No matching models"), 0, 0));

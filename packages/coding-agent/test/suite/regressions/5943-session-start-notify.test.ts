@@ -12,6 +12,7 @@ type LoadedResourcesContext = {
 	loadedResourcesContainer: Container;
 	chatContainer: Container;
 	options: { verbose?: boolean };
+	ui: { terminal: { columns: number; rows: number } };
 	settingsManager: { getQuietStartup: () => boolean };
 	sessionManager: { getCwd: () => string };
 	session: {
@@ -192,6 +193,7 @@ function createLoadedResourcesContext(): LoadedResourcesContext {
 		loadedResourcesContainer: new Container(),
 		chatContainer: new Container(),
 		options: { verbose: true },
+		ui: { terminal: { columns: 80, rows: 24 } },
 		settingsManager: { getQuietStartup: () => false },
 		sessionManager: { getCwd: () => "/repo" },
 		session: {

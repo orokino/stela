@@ -29,6 +29,9 @@ export const SETTINGS_DEFAULTS = {
 	defaultProjectTrust: "ask",
 	collapseChangelog: false,
 	enableInstallTelemetry: true,
+	telemetry: {
+		showExtendedTelemetry: false,
+	},
 	enableAnalytics: false,
 	enableSkillCommands: true,
 	terminal: {

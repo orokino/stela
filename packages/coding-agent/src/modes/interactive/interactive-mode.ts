@@ -36,6 +36,7 @@ import {
 	Container,
 	fuzzyFilter,
 	getCapabilities,
+	getSymbolPreset,
 	hyperlink,
 	Markdown,
 	matchesKey,
@@ -147,6 +148,7 @@ import { AssistantMessageComponent } from "./components/assistant-message.ts";
 import { BashExecutionComponent } from "./components/bash-execution.ts";
 import { BranchSummaryMessageComponent } from "./components/branch-summary-message.ts";
 import { CompactionSummaryMessageComponent } from "./components/compaction-summary-message.ts";
+import { ComposerHintRowComponent, type ComposerHintSegment } from "./components/composer-hint-row.ts";
 import { CustomEditor } from "./components/custom-editor.ts";
 import { CustomEntryComponent } from "./components/custom-entry.ts";
 import { CustomMessageComponent } from "./components/custom-message.ts";
@@ -175,6 +177,7 @@ import { createLoginMenuSelector } from "./components/radius-login-selector.ts";
 import { ScopedModelsSelectorComponent } from "./components/scoped-models-selector.ts";
 import { SessionSelectorComponent } from "./components/session-selector.ts";
 import { SettingsSelectorComponent } from "./components/settings-selector.ts";
+import { ShortcutsOverlayComponent } from "./components/shortcuts-overlay.ts";
 import { SkillInvocationMessageComponent } from "./components/skill-invocation-message.ts";
 import {
 	BranchSummaryStatusIndicator,
@@ -489,6 +492,9 @@ export class InteractiveMode {
 	private autocompleteProviderWrappers: AutocompleteProviderFactory[] = [];
 	private fdPath: string | undefined;
 	private editorContainer: Container;
+	private composerHintRow: ComposerHintRowComponent;
+	private composerHintContainer: Container;
+	private shortcutsOverlay: ShortcutsOverlayComponent | undefined;
 	private activeSelectorToken?: object;
 	private activeSelectorDispose?: () => void;
 	private footer: FooterComponent;
@@ -680,13 +686,21 @@ export class InteractiveMode {
 			paddingX: editorPaddingX,
 			autocompleteMaxVisible,
 			embedWorkingStatus: true,
+			gutterSymbol: "❯",
+			placeholder: "Type a message, / for commands, ! for bash",
 		});
+		this.defaultEditor.setBottomStatusText(() => this.composerBorderStatus());
 		this.editor = this.defaultEditor;
 		this.editorContainer = new Container();
 		this.editorContainer.addChild(this.editor as Component);
+		this.composerHintRow = new ComposerHintRowComponent();
+		this.composerHintRow.setSegments(this.composerHintSegments(false));
+		this.composerHintContainer = new Container();
+		this.composerHintContainer.addChild(this.composerHintRow);
 		this.footerDataProvider = new FooterDataProvider(this.sessionManager.getCwd());
 		this.footer = new FooterComponent(this.session, this.footerDataProvider);
 		this.footer.setAutoCompactEnabled(this.session.autoCompactionEnabled);
+		this.footer.setShowExtendedTelemetry(this.settingsManager.getShowExtendedTelemetry());
 		this.footerContainer = new Container();
 		this.footerContainer.addChild(this.footer);
 
@@ -754,13 +768,18 @@ export class InteractiveMode {
 	}
 
 	private createBaseAutocompleteProvider(): AutocompleteProvider {
-		// Define commands for autocomplete
+		// Define commands for autocomplete. Model / thinking / plan carry live
+		// values so the dropdown shows current state (S2 ranked live values).
+		const model = this.session?.state?.model;
+		const liveDescriptions: Record<string, string> = {};
+		if (model) liveDescriptions.model = `Model: ${model.id}`;
+		liveDescriptions.thinking = `Thinking: ${this.session?.thinkingLevel ?? "off"}`;
+		liveDescriptions.plan = `Plan: ${this.session?.permissions?.mode === "plan" ? "on" : "off"}`;
 		const slashCommands: SlashCommand[] = BUILTIN_SLASH_COMMANDS.map((command) => ({
 			name: command.name,
-			description: command.description,
+			description: liveDescriptions[command.name] ?? command.description,
 			...(command.argumentHint && { argumentHint: command.argumentHint }),
 		}));
-
 		const modelCommand = slashCommands.find((command) => command.name === "model");
 		if (modelCommand) {
 			modelCommand.getArgumentCompletions = (prefix: string): AutocompleteItem[] | null => {
@@ -1004,7 +1023,7 @@ export class InteractiveMode {
 			status: this.statusContainer,
 			widgetsAbove: this.widgetContainerAbove,
 			editor: this.editorContainer,
-			widgetsBelow: this.widgetContainerBelow,
+			widgetsBelow: this.composerHintContainer,
 			footer: this.footerContainer,
 			scrollbar: this.settingsManager.getFullscreenScrollbar(),
 			scrollbarTrackStyle: (text) => theme.fg("scrollbarTrack", text),
@@ -1018,7 +1037,7 @@ export class InteractiveMode {
 			this.statusContainer,
 			this.widgetContainerAbove,
 			this.editorContainer,
-			this.widgetContainerBelow,
+			this.composerHintContainer,
 			this.footerContainer,
 		]);
 		// Accept text while startup completes, but only enable interrupt, exit, and submission feedback.
@@ -1054,7 +1073,8 @@ export class InteractiveMode {
 							tagline: "A model-agnostic coding agent.",
 							menu: STELA_STARTUP_MENU,
 							columns: this.ui.terminal.columns,
-							rows: this.ui.terminal.rows,
+							rows: this.ui.terminal?.rows ?? 24,
+							ascii: getSymbolPreset() === "ascii",
 						});
 						return `${card.join("\n")}\n${hints}`;
 					}
@@ -1182,10 +1202,12 @@ export class InteractiveMode {
 	private updateTerminalTitle(): void {
 		const cwdBasename = path.basename(this.sessionManager.getCwd());
 		const sessionName = this.sessionManager.getSessionName();
-		// OSC 0 always carries a state word (CX U11): Working while streaming, else Ready.
-		const state = this.session.isStreaming ? "Working" : "Ready";
+		// OSC 0 always carries a state word (CX U11). Order: Action Required while a dialog
+		// waits, Working while streaming, else Ready. Dialog transitions rewrite on change.
+		const blocked = this.programStatus.hasBlocked();
+		const state = blocked ? "[ ! ] Action Required" : this.session.isStreaming ? "[Working]" : "[Ready]";
 		const location = sessionName ? `${sessionName} - ${cwdBasename}` : cwdBasename;
-		this.ui.terminal.setTitle(`${APP_TITLE} [${state}] - ${location}`);
+		this.ui.terminal.setTitle(`${APP_TITLE} ${state} - ${location}`);
 	}
 
 	/**
@@ -2779,6 +2801,7 @@ export class InteractiveMode {
 			this.ui.setFocus(this.extensionSelector);
 			// Extension dialogs share the editor slot: opening one replaces the status of a displaced one.
 			this.programStatus.setBlocked("extension-dialog", blocked);
+			this.updateTerminalTitle();
 			this.notifier.notify("needs-input", blocked.message);
 		});
 	}
@@ -2792,6 +2815,7 @@ export class InteractiveMode {
 		this.editorContainer.addChild(this.editor);
 		this.extensionSelector = undefined;
 		this.programStatus.setBlocked("extension-dialog", undefined);
+		this.updateTerminalTitle();
 		this.ui.setFocus(this.editor);
 		this.ui.requestRender();
 	}
@@ -2860,6 +2884,7 @@ export class InteractiveMode {
 			this.editorContainer.addChild(this.extensionInput);
 			this.ui.setFocus(this.extensionInput);
 			this.programStatus.setBlocked("extension-dialog", dialogBlockedStatus(title, opts));
+			this.updateTerminalTitle();
 			this.notifier.notify("needs-input", title);
 		});
 	}
@@ -2873,6 +2898,7 @@ export class InteractiveMode {
 		this.editorContainer.addChild(this.editor);
 		this.extensionInput = undefined;
 		this.programStatus.setBlocked("extension-dialog", undefined);
+		this.updateTerminalTitle();
 		this.ui.setFocus(this.editor);
 		this.ui.requestRender();
 	}
@@ -2904,6 +2930,7 @@ export class InteractiveMode {
 			this.editorContainer.addChild(this.extensionEditor);
 			this.ui.setFocus(this.extensionEditor);
 			this.programStatus.setBlocked("extension-dialog", { kind: "question", message: title });
+			this.updateTerminalTitle();
 			this.ui.requestRender();
 		});
 	}
@@ -2916,6 +2943,7 @@ export class InteractiveMode {
 		this.editorContainer.addChild(this.editor);
 		this.extensionEditor = undefined;
 		this.programStatus.setBlocked("extension-dialog", undefined);
+		this.updateTerminalTitle();
 		this.ui.setFocus(this.editor);
 		this.ui.requestRender();
 	}
@@ -3159,7 +3187,10 @@ export class InteractiveMode {
 		// Global debug handler on TUI (works regardless of focus)
 		this.ui.onDebug = () => this.handleDebugCommand();
 		this.defaultEditor.onAction("app.model.select", () => this.showModelSelector());
-		this.defaultEditor.onAction("app.tools.expand", () => this.toggleToolOutputExpansion());
+		// S8: ctrl+o is the global transcript toggle — it expands/collapses tool
+		// output AND thinking runs together, so one key discloses every collapsed
+		// row. (Batch A owns the keybinding itself; this only adds the thinking half.)
+		this.defaultEditor.onAction("app.tools.expand", () => this.toggleTranscriptExpansion());
 		this.defaultEditor.onAction("app.thinking.toggle", () => this.toggleThinkingBlockVisibility());
 		this.defaultEditor.onAction("app.editor.external", () => void this.handleOpenExternalEditor());
 		this.defaultEditor.onAction(
@@ -3168,17 +3199,17 @@ export class InteractiveMode {
 		);
 		this.defaultEditor.onAction("app.message.followUp", () => this.handleFollowUp());
 		this.defaultEditor.onAction("app.message.dequeue", () => this.handleDequeue());
+		this.defaultEditor.onAction("app.editor.pasteExpand", () => this.handlePasteExpand());
+		this.defaultEditor.onAction("app.shortcuts.toggle", () => this.toggleShortcutsOverlay());
 		this.defaultEditor.onAction("app.session.new", () => this.handleClearCommand());
-		this.defaultEditor.onAction("app.session.tree", () => this.showTreeSelector());
-		this.defaultEditor.onAction("app.session.fork", () => this.showUserMessageSelector());
-		this.defaultEditor.onAction("app.session.resume", () => this.showSessionSelector());
-
 		this.defaultEditor.onChange = (text: string) => {
 			const wasBashMode = this.isBashMode;
 			this.isBashMode = text.trimStart().startsWith("!");
 			if (wasBashMode !== this.isBashMode) {
 				this.updateEditorBorderColor();
 			}
+			this.composerHintRow.setHasDraft(text.length > 0);
+			this.composerHintRow.setSegments(this.composerHintSegments(text.length > 0));
 		};
 
 		// Handle clipboard paste (triggered on Ctrl+V). Copied files use their original paths,
@@ -3700,6 +3731,9 @@ export class InteractiveMode {
 					this.pendingTools.set(event.toolCallId, component);
 				}
 				component.markExecutionStarted();
+				if (this.activeStatusIndicator instanceof WorkingStatusIndicator) {
+					this.activeStatusIndicator.setRunningTool(event.toolName);
+				}
 				this.ui.requestRender();
 				break;
 			}
@@ -3720,6 +3754,9 @@ export class InteractiveMode {
 					component.updateResult({ ...event.result, isError: event.isError, durationMs: event.durationMs });
 					this.pendingTools.delete(event.toolCallId);
 					this.ui.requestRender();
+				}
+				if (this.activeStatusIndicator instanceof WorkingStatusIndicator) {
+					this.activeStatusIndicator.setRunningTool(undefined);
 				}
 				break;
 			}
@@ -3743,6 +3780,7 @@ export class InteractiveMode {
 				break;
 
 			case "agent_settled":
+				this.updateTerminalTitle();
 				await this.checkShutdownRequested();
 				break;
 
@@ -4635,6 +4673,55 @@ export class InteractiveMode {
 		}
 	}
 
+	/** Composer bottom-border status: the ONLY home for model + thinking + mode. */
+	private composerBorderStatus(): string | undefined {
+		const model = this.session.state.model;
+		if (!model) return undefined;
+		const thinking = this.session.thinkingLevel ?? "off";
+		const mode = this.session.permissions ? PERMISSION_MODE_LABELS[this.session.permissions.mode] : undefined;
+		const thinkingPart = model.reasoning ? (thinking === "off" ? "thinking off" : thinking) : undefined;
+		return [model.id, thinkingPart, mode].filter((part) => part !== undefined).join(" · ");
+	}
+
+	/** Contextual hint segments for the row beneath the composer. */
+	private composerHintSegments(hasDraft: boolean): ComposerHintSegment[] {
+		if (hasDraft) {
+			return [
+				{ keybinding: "tui.input.submit", label: "send" },
+				{ keybinding: "tui.input.newLine", label: "newline" },
+				{ keybinding: "app.permissions.cycle", label: "mode" },
+				{ keybinding: "app.shortcuts.toggle", label: "shortcuts" },
+			];
+		}
+		return [
+			{ keybinding: "app.permissions.cycle", label: "mode" },
+			{ keybinding: "app.shortcuts.toggle", label: "shortcuts" },
+		];
+	}
+
+	private handlePasteExpand(): void {
+		const expanded = this.defaultEditor.expandMostRecentPaste();
+		if (!expanded) this.showStatus("No collapsed paste to expand");
+	}
+
+	private toggleShortcutsOverlay(): void {
+		if (this.shortcutsOverlay) {
+			this.ui.hideOverlay();
+			this.shortcutsOverlay = undefined;
+			this.ui.requestRender();
+			return;
+		}
+		const overlay = new ShortcutsOverlayComponent();
+		overlay.onClose = () => {
+			this.ui.hideOverlay();
+			this.shortcutsOverlay = undefined;
+			this.ui.requestRender();
+		};
+		this.shortcutsOverlay = overlay;
+		this.ui.showOverlay(overlay, { anchor: "center", width: 64, maxHeight: "80%" });
+		this.ui.requestRender();
+	}
+
 	private updateEditorBorderColor(): void {
 		if (this.isBashMode) {
 			this.editor.borderColor = theme.getBashModeBorderColor();
@@ -4738,6 +4825,22 @@ export class InteractiveMode {
 
 	private toggleToolOutputExpansion(): void {
 		this.setToolsExpanded(!this.toolOutputExpanded);
+	}
+
+	/**
+	 * S8 global transcript toggle: ctrl+o expands/collapses tool output (via
+	 * setToolsExpanded, which already reaches every Expandable child including
+	 * thinking overrides through AssistantMessageComponent.setExpanded paths)
+	 * and flips the thinking-block default to match, so collapsed rows disclose
+	 * together. Thinking overrides are per-run; the default flip keeps future
+	 * runs consistent with the toggle direction.
+	 */
+	private toggleTranscriptExpansion(): void {
+		const expanded = !this.toolOutputExpanded;
+		this.setToolsExpanded(expanded);
+		if (this.hideThinkingBlock === expanded) {
+			this.toggleThinkingBlockVisibility();
+		}
 	}
 
 	private setToolsExpanded(expanded: boolean): void {
@@ -5153,6 +5256,11 @@ export class InteractiveMode {
 					quietStartup: this.settingsManager.getQuietStartup(),
 					clearOnShrink: this.settingsManager.getClearOnShrink(),
 					showTerminalProgress: this.settingsManager.getShowTerminalProgress(),
+					animationsEnabled: this.settingsManager.getAnimationsEnabled(),
+					symbolPreset: this.settingsManager.getSymbolPreset(),
+					notificationMode: this.settingsManager.getNotificationMode(),
+					notifyWhenFocused: this.settingsManager.getNotifyWhenFocused(),
+					fullscreenMouse: this.settingsManager.getFullscreenMouse(),
 					tuiMode: this.ui.mode,
 					fullscreenExitOutput: this.settingsManager.getFullscreenExitOutput(),
 					fullscreenScrollbar: this.settingsManager.getFullscreenScrollbar(),
@@ -5307,6 +5415,30 @@ export class InteractiveMode {
 					},
 					onShowTerminalProgressChange: (enabled) => {
 						this.settingsManager.setShowTerminalProgress(enabled);
+					},
+					onAnimationsEnabledChange: (enabled) => {
+						this.settingsManager.setAnimationsEnabled(enabled);
+						this.showStatus(`Terminal animations: ${enabled ? "on" : "off"}`);
+					},
+					onSymbolPresetChange: (preset) => {
+						this.settingsManager.setSymbolPreset(preset);
+						setSymbolPreset(preset);
+						this.showStatus(`Terminal symbols: ${preset}`);
+					},
+					onNotificationModeChange: (mode) => {
+						this.settingsManager.setNotificationMode(mode);
+						this.showStatus(`Notification mode: ${mode}`);
+					},
+					onNotifyWhenFocusedChange: (enabled) => {
+						this.settingsManager.setNotifyWhenFocused(enabled);
+					},
+					onFullscreenMouseChange: (enabled) => {
+						this.settingsManager.setFullscreenMouse(enabled);
+						this.showStatus(
+							enabled
+								? "Fullscreen mouse capture on (takes effect in fullscreen mode)"
+								: "Fullscreen mouse capture off",
+						);
 					},
 					onTuiModeChange: (mode) => {
 						if (!this.switchTuiMode(mode)) {
@@ -5574,6 +5706,7 @@ export class InteractiveMode {
 				initialSearchInput,
 				(model) => selectModel(model, true),
 				defaultProvider && defaultModel ? { provider: defaultProvider, id: defaultModel } : undefined,
+				this.ui.terminal?.rows ?? 24,
 			);
 			return { component: selector, focus: selector, dispose: () => selector.dispose() };
 		});
@@ -5653,6 +5786,7 @@ export class InteractiveMode {
 						this.ui.requestRender();
 					},
 				},
+				this.ui.terminal?.rows ?? 24,
 			);
 			void refreshModelCatalogs(this.session.modelRuntime, controller.signal)
 				.then((result) => {
@@ -5774,7 +5908,7 @@ export class InteractiveMode {
 			const selector = new TreeSelectorComponent(
 				tree,
 				realLeafId,
-				this.ui.terminal.rows,
+				this.ui.terminal?.rows ?? 24,
 				async (entryId) => {
 					// Selecting the current leaf is a no-op (already there)
 					if (entryId === this.sessionManager.getLeafId()) {
@@ -5945,8 +6079,8 @@ export class InteractiveMode {
 					showRenameHint: true,
 					keybindings: this.keybindings,
 				},
-
 				this.sessionManager.getSessionFile(),
+				this.ui.terminal?.rows ?? 24,
 			);
 			return { component: selector, focus: selector };
 		});
@@ -6202,6 +6336,7 @@ export class InteractiveMode {
 					}
 				},
 				initialSearchInput,
+				this.ui.terminal?.rows ?? 24,
 			);
 			return { component: selector, focus: selector };
 		});
@@ -6262,6 +6397,8 @@ export class InteractiveMode {
 					done();
 					this.ui.requestRender();
 				},
+				undefined,
+				this.ui.terminal?.rows ?? 24,
 			);
 			return { component: selector, focus: selector };
 		});
@@ -6523,6 +6660,7 @@ export class InteractiveMode {
 		method: "api_key" | "oauth",
 	): Promise<void> {
 		this.programStatus.setBlocked("login", { kind: "auth", message: `Log in to ${providerName}` });
+		this.updateTerminalTitle();
 		try {
 			await this.session.modelRuntime.login(
 				providerId,
@@ -6536,6 +6674,7 @@ export class InteractiveMode {
 			);
 		} finally {
 			this.programStatus.setBlocked("login", undefined);
+			this.updateTerminalTitle();
 		}
 	}
 
@@ -7053,8 +7192,9 @@ export class InteractiveMode {
 		const copyMessage = this.getAppKeyDisplay("app.message.copy");
 		const followUp = this.getAppKeyDisplay("app.message.followUp");
 		const dequeue = this.getAppKeyDisplay("app.message.dequeue");
+		const pasteExpand = this.getAppKeyDisplay("app.editor.pasteExpand");
+		const shortcutsOverlay = this.getAppKeyDisplay("app.shortcuts.toggle");
 		const pasteImage = this.getAppKeyDisplay("app.clipboard.pasteImage");
-
 		let hotkeys = `
 **Navigation**
 | Key | Action |
@@ -7098,6 +7238,8 @@ export class InteractiveMode {
 | \`${copyMessage}\` | Copy selection or last assistant message |
 | \`${followUp}\` | Queue follow-up message |
 | \`${dequeue}\` | Restore queued messages |
+| \`${pasteExpand}\` | Re-expand collapsed paste (paste again to expand) |
+| \`${shortcutsOverlay}\` | Show keyboard shortcuts overlay |
 | \`${pasteImage}\` | Paste files on macOS, images, or text from clipboard |
 | \`/\` | Slash commands |
 | \`!\` | Run bash command |
@@ -7233,6 +7375,7 @@ export class InteractiveMode {
 
 			// Record the result in session
 			this.session.recordBashResult(command, result, { excludeFromContext });
+			if (excludeFromContext) this.taskHud?.addFinished(command);
 			this.bashComponent = undefined;
 			this.ui.requestRender();
 			return;
@@ -7281,6 +7424,9 @@ export class InteractiveMode {
 			this.showError(`Bash command failed: ${error instanceof Error ? error.message : "Unknown error"}`);
 		}
 
+		// Background (`!!`) shells have no visible foreground result once done: their foreground
+		// `!` siblings surface completion through the tool card, so only `!!` earns the HUD row.
+		if (excludeFromContext) this.taskHud?.addFinished(command);
 		this.bashComponent = undefined;
 		this.updatePendingMessagesDisplay();
 		this.ui.requestRender();

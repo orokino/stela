@@ -930,6 +930,23 @@ export class SettingsManager {
 	getNotifyWhenFocused(): boolean {
 		return this.settings.notifications?.notifyWhenFocused ?? SETTINGS_DEFAULTS.notifications.notifyWhenFocused;
 	}
+	setNotificationMode(mode: "off" | "auto" | "bell"): void {
+		if (!this.globalSettings.notifications) {
+			this.globalSettings.notifications = {};
+		}
+		this.globalSettings.notifications.mode = mode;
+		this.markModified("notifications", "mode");
+		this.save();
+	}
+
+	setNotifyWhenFocused(enabled: boolean): void {
+		if (!this.globalSettings.notifications) {
+			this.globalSettings.notifications = {};
+		}
+		this.globalSettings.notifications.notifyWhenFocused = enabled;
+		this.markModified("notifications", "notifyWhenFocused");
+		this.save();
+	}
 
 	getProviderRetrySettings(): { timeoutMs?: number; maxRetries?: number; maxRetryDelayMs: number } {
 		return {
@@ -1051,6 +1068,17 @@ export class SettingsManager {
 
 	getEnableAnalytics(): boolean {
 		return this.settings.enableAnalytics ?? SETTINGS_DEFAULTS.enableAnalytics;
+	}
+
+	getShowExtendedTelemetry(): boolean {
+		return this.settings.telemetry?.showExtendedTelemetry ?? SETTINGS_DEFAULTS.telemetry.showExtendedTelemetry;
+	}
+
+	setShowExtendedTelemetry(show: boolean): void {
+		this.globalSettings.telemetry ??= {};
+		this.globalSettings.telemetry.showExtendedTelemetry = show;
+		this.markModified("telemetry", "showExtendedTelemetry");
+		this.save();
 	}
 
 	getTrackingId(): string | undefined {

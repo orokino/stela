@@ -1,6 +1,7 @@
-import type { TUI } from "@earendil-works/pi-tui";
-import { beforeAll, describe, expect, it } from "vitest";
-import { formatToolHead, toolHeadStatus } from "../src/core/tools/render-utils.ts";
+import { setSymbolPreset, type TUI } from "@earendil-works/pi-tui";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { formatToolHead, toolHeadStatus, truncatePathStart } from "../src/core/tools/render-utils.ts";
+import { signalNameForExitCode } from "../src/core/tools/renderers/bash.ts";
 import { ExploredGroupComponent, isGroupableToolName } from "../src/modes/interactive/components/explored-group.ts";
 import { ToolExecutionComponent } from "../src/modes/interactive/components/tool-execution.ts";
 import { initTheme, theme } from "../src/modes/interactive/theme/theme.ts";
@@ -18,6 +19,7 @@ function finishedCard(name: string, id: string): ToolExecutionComponent {
 
 describe("shared tool-card grammar", () => {
 	beforeAll(() => initTheme("dark"));
+	afterEach(() => setSymbolPreset("unicode"));
 
 	it("heads every card with status glyph, verb, primary arg, and meta", () => {
 		const head = stripAnsi(
@@ -57,5 +59,23 @@ describe("shared tool-card grammar", () => {
 		const expanded = stripAnsi(group.render(80).join("\n"));
 		expect(expanded).toContain("read");
 		expect(expanded).toContain("grep");
+	});
+
+	it("qualifies signal exits by name and leaves other codes bare", () => {
+		expect(signalNameForExitCode(143)).toBe("SIGTERM");
+		expect(signalNameForExitCode(137)).toBe("SIGKILL");
+		expect(signalNameForExitCode(1)).toBeUndefined();
+		expect(signalNameForExitCode(200)).toBeUndefined();
+	});
+
+	it("truncates paths from the start, keeping the tail, in both alphabets", () => {
+		expect(truncatePathStart("/very/long/path/to/file.txt", 14)).toContain("file.txt");
+		expect(truncatePathStart("short", 14)).toBe("short");
+		setSymbolPreset("ascii");
+		try {
+			expect(truncatePathStart("/very/long/path/to/file.txt", 14)).toMatch(/^\.\.\./);
+		} finally {
+			setSymbolPreset("unicode");
+		}
 	});
 });

@@ -12,8 +12,14 @@ import {
 } from "@earendil-works/pi-tui";
 import type { MarkdownTransformer } from "../../../core/extensions/types.ts";
 import { getMarkdownTheme, theme } from "../theme/theme.ts";
+import { keyText } from "./keybinding-hints.ts";
 import { createMarkdownTransform } from "./markdown-transform.ts";
-import { formatThinkingLive, formatThoughtDuration } from "./message-glyphs.ts";
+import {
+	formatThinkingLive,
+	formatThoughtCollapsed,
+	formatThoughtCollapsedDuration,
+	formatTurnMetaLine,
+} from "./message-glyphs.ts";
 
 const OSC133_ZONE_START = "\x1b]133;A\x07";
 const OSC133_ZONE_END = "\x1b]133;B\x07";
@@ -74,6 +80,33 @@ export class AssistantMessageComponent extends Container {
 		this.hideThinkingBlock = hide;
 		this.thinkingVisibilityOverrides.clear();
 		if (this.lastMessage) {
+			this.updateContent(this.lastMessage);
+		}
+	}
+
+	/**
+	 * S8: per-run expand/collapse for the global ctrl+o transcript toggle (which
+	 * sweeps every Expandable child). Sets each run's override explicitly so the
+	 * toggle direction wins over the hideThinkingBlock default.
+	 */
+	setExpanded(expanded: boolean): void {
+		const runs = this.thinkingVisibilityOverrides.size;
+		if (this.lastMessage) {
+			let runCount = 0;
+			let inRun = false;
+			for (const c of this.lastMessage.content) {
+				if (c.type === "thinking") {
+					if (!inRun) {
+						inRun = true;
+						runCount++;
+					}
+				} else {
+					inRun = false;
+				}
+			}
+			for (let i = 0; i < Math.max(runCount, runs); i++) {
+				this.thinkingVisibilityOverrides.set(i, !expanded);
+			}
 			this.updateContent(this.lastMessage);
 		}
 	}
@@ -178,26 +211,45 @@ export class AssistantMessageComponent extends Container {
 				const hidden = this.thinkingVisibilityOverrides.get(runIndex) ?? this.hideThinkingBlock;
 				if (isLiveRun && hidden) {
 					this.renderLiveThinkingRow(runIndex);
+				} else if (hidden) {
+					// S8 one-line collapse: `+ Thought · <duration> · <N> lines · <key>
+					// to expand`. Count + key are CU's affordance (cursor-agent.md U3)
+					// grafted onto OC's one-line shape (opencode.md U3) — synthesis,
+					// uniform on all durations including <1s. Key is live-resolved so
+					// the hint can never go stale.
+					const hiddenLines = thinkingBlocks.join("\n").split("\n").length;
+					const label = formatThoughtCollapsed(
+						formatThoughtCollapsedDuration(message.durationMs),
+						hiddenLines,
+						keyText("app.tools.expand"),
+					);
+					const thinkingComponent = new Text(theme.fg("dim", label), this.outputPad, 0);
+					this.contentContainer.addChild(
+						new MouseRegion(thinkingComponent, (event) => {
+							if (event.type !== "click" || event.button !== "left") return undefined;
+							this.thinkingVisibilityOverrides.set(runIndex, !hidden);
+							if (this.lastMessage) this.updateContent(this.lastMessage);
+							return { handled: true };
+						}),
+					);
 				} else {
-					const thinkingComponent = hidden
-						? new Text(theme.fg("dim", `+ ${formatThoughtDuration(message.durationMs)}`), this.outputPad, 0)
-						: new Markdown(
-								thinkingBlocks.join("\n\n"),
-								this.outputPad,
-								0,
-								this.markdownTheme,
-								{
-									color: (text: string) => theme.fg("thinkingText", text),
-									italic: true,
-								},
-								{
-									transform: createMarkdownTransform(
-										"assistant-thinking",
-										this.isStreaming,
-										this.markdownTransformers,
-									),
-								},
-							);
+					const thinkingComponent = new Markdown(
+						thinkingBlocks.join("\n\n"),
+						this.outputPad,
+						0,
+						this.markdownTheme,
+						{
+							color: (text: string) => theme.fg("thinkingText", text),
+							italic: true,
+						},
+						{
+							transform: createMarkdownTransform(
+								"assistant-thinking",
+								this.isStreaming,
+								this.markdownTransformers,
+							),
+						},
+					);
 					this.contentContainer.addChild(
 						new MouseRegion(thinkingComponent, (event) => {
 							if (event.type !== "click" || event.button !== "left") return undefined;
@@ -213,9 +265,9 @@ export class AssistantMessageComponent extends Container {
 			}
 		}
 
-		// Check if incomplete/failed - show after partial content.
-		// For aborted/error tool calls, tool execution components show the error.
-		// Length stops can happen before a tool call is complete, so surface them here too.
+		// S7 transcript tail: muted meta line (`duration · tok/s`, no model — the
+		// composer border owns it), then a muted `· interrupted` for aborts (never
+		// error colour: an interrupt is a user action, not a failure).
 		const hasToolCalls = message.content.some((c) => c.type === "toolCall");
 		this.hasToolCalls = hasToolCalls;
 		if (message.stopReason === "length") {
@@ -225,16 +277,38 @@ export class AssistantMessageComponent extends Container {
 			);
 		} else if (!hasToolCalls) {
 			if (message.stopReason === "aborted") {
-				const abortMessage =
-					message.errorMessage && message.errorMessage !== "Request was aborted"
-						? message.errorMessage
-						: "Operation aborted";
+				// S7: muted `· interrupted`, never red. Custom abort reasons (retry
+				// counts) still surface, but plain cancels collapse to the literal.
+				const customAbort =
+					message.errorMessage &&
+					message.errorMessage !== "Request was aborted" &&
+					message.errorMessage !== "Operation aborted"
+						? ` · ${message.errorMessage}`
+						: "";
 				this.contentContainer.addChild(new Spacer(1));
-				this.contentContainer.addChild(new Text(theme.fg("error", abortMessage), this.outputPad, 0));
+				this.contentContainer.addChild(
+					new Text(
+						theme.fg(
+							"dim",
+							`${formatTurnMetaLine(message.durationMs, message.usage?.totalTokens)} · interrupted${customAbort}`,
+						),
+						this.outputPad,
+						0,
+					),
+				);
 			} else if (message.stopReason === "error") {
 				const errorMsg = message.errorMessage || "Unknown error";
 				this.contentContainer.addChild(new Spacer(1));
 				this.contentContainer.addChild(new Text(theme.fg("error", `Error: ${errorMsg}`), this.outputPad, 0));
+			} else if (!isStreaming && message.usage && hasVisibleContent && !hasToolCalls) {
+				this.contentContainer.addChild(new Spacer(1));
+				this.contentContainer.addChild(
+					new Text(
+						theme.fg("dim", formatTurnMetaLine(message.durationMs, message.usage?.totalTokens)),
+						this.outputPad,
+						0,
+					),
+				);
 			}
 		}
 		// A finished or fully visible turn owns no live row; stop its clock.

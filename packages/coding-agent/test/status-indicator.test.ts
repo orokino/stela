@@ -1,13 +1,16 @@
-import { type TUI, visibleWidth } from "@earendil-works/pi-tui";
+import { setSymbolPreset, type TUI, visibleWidth } from "@earendil-works/pi-tui";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { KeybindingsManager } from "../src/core/keybindings.ts";
 import { CustomEditor } from "../src/modes/interactive/components/custom-editor.ts";
 import {
 	BranchSummaryStatusIndicator,
 	CompactionStatusIndicator,
+	formatWorkingElapsed,
 	IdleStatus,
 	RetryStatusIndicator,
+	stallLadderSuffix,
 	WorkingStatusIndicator,
+	workingStatusMessage,
 } from "../src/modes/interactive/components/status-indicator.ts";
 import { getEditorTheme, initTheme, theme } from "../src/modes/interactive/theme/theme.ts";
 import { stripAnsi } from "../src/utils/ansi.ts";
@@ -57,9 +60,9 @@ describe("status indicators", () => {
 		editor.setWorkingStatusIndicator(indicator);
 
 		const topBorder = editor.render(20)[0]!;
-		expect(stripAnsi(topBorder)).toBe("── ⠋ Working ───────");
+		expect(stripAnsi(topBorder)).toBe("── ⠈⠞ Working ──────");
 		expect(visibleWidth(topBorder)).toBe(20);
-		expect(topBorder.split(theme.getFgAnsi("thinkingHigh"))).toHaveLength(5);
+		expect(topBorder).toContain(theme.getFgAnsi("thinkingHigh"));
 		indicator.dispose();
 	});
 
@@ -107,5 +110,40 @@ describe("status indicators", () => {
 		vi.advanceTimersByTime(2000);
 
 		expect(requestRender).toHaveBeenCalledTimes(callsBeforeDispose);
+	});
+
+	it("climbs the stall ladder with words only, no new motion", () => {
+		expect(formatWorkingElapsed(3_000)).toBe("3s");
+		expect(formatWorkingElapsed(72_000)).toBe("1m12s");
+		expect(formatWorkingElapsed(312_000)).toBe("5m12s");
+		expect(stallLadderSuffix(9_999)).toBe("");
+		expect(stallLadderSuffix(10_000)).toContain("still working");
+		expect(stallLadderSuffix(45_000)).toContain("still checking");
+		expect(stallLadderSuffix(300_000)).toContain("still alive");
+	});
+
+	it("names the running tool after the 2 s line, with ASCII parity", () => {
+		const before = workingStatusMessage({
+			elapsedMs: 5_000,
+			interruptHint: "esc",
+			toolName: "read",
+			toolElapsedMs: 1_999,
+		});
+		expect(before).not.toContain("running read");
+		expect(
+			workingStatusMessage({ elapsedMs: 12_000, interruptHint: "esc", toolName: "read", toolElapsedMs: 12_000 }),
+		).toContain("running read for 12s");
+		expect(
+			workingStatusMessage({ elapsedMs: 47_000, interruptHint: "esc", toolName: "read", toolElapsedMs: 47_000 }),
+		).toContain("still checking");
+		setSymbolPreset("ascii");
+		try {
+			expect(
+				workingStatusMessage({ elapsedMs: 12_000, interruptHint: "esc", toolName: "read", toolElapsedMs: 12_000 }),
+			).toContain("running read for 12s");
+			expect(workingStatusMessage({ elapsedMs: 5_000, interruptHint: "esc" })).not.toContain("·");
+		} finally {
+			setSymbolPreset("unicode");
+		}
 	});
 });

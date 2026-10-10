@@ -92,12 +92,13 @@ const CARD_WIDTH = 78;
 const MARK_WIDTH = 17;
 const MARK_INDENT = 4;
 const TEXT_COLUMN = MARK_INDENT + MARK_WIDTH + 3;
-const MIN_COLUMNS = 56;
-const CARD_ROWS = 12;
+/** Framed card needs >=90 cols AND >=25 rows (GK U2); the compact form covers everything else. */
+export const STELA_CARD_MIN_COLUMNS = 90;
+export const STELA_CARD_MIN_ROWS = 25;
 
-/** Whether the framed card fits: the frame shrinks to `columns - 2` but needs 56 cells to stay readable. */
+/** Whether the framed card fits: 90 cols AND 25 rows, else the narrow form. */
 export function stelaCardFits(columns: number, rows: number): boolean {
-	return columns - 2 >= MIN_COLUMNS && rows >= CARD_ROWS;
+	return columns >= STELA_CARD_MIN_COLUMNS && rows >= STELA_CARD_MIN_ROWS;
 }
 
 /** The narrow fallback: one accent glyph, the name, and the menu without the frame. */

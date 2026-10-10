@@ -89,7 +89,9 @@ describe("edit tool TUI rendering", () => {
 			"utf8",
 		);
 		const lines = (await readFile(filePath, "utf8")).trimEnd().split("\n");
-		const edits = createLargeEdits(lines);
+		// Two hunks stay inside the 40-line / 8-hunk collapse budget so the full
+		// preview renders; the test pins no-full-redraw on settle, not collapse.
+		const edits = createLargeEdits(lines).slice(0, 2);
 		const diff = await computeEditsDiff(filePath, edits, process.cwd());
 		if ("error" in diff) {
 			throw new Error(diff.error);
@@ -127,7 +129,7 @@ describe("edit tool TUI rendering", () => {
 			() => tui.requestRender(true),
 		);
 		expect(callOnlyRender).toContain("edit");
-		expect(callOnlyRender).toContain("line 950 changed");
+		expect(callOnlyRender).toContain("line 150 changed");
 
 		const redrawsBeforeResult = tui.fullRedraws;
 		const clearsBeforeResult = terminal.fullClearCount;
@@ -147,7 +149,7 @@ describe("edit tool TUI rendering", () => {
 
 		const settledRender = component.render(80).join("\n");
 		expect(settledRender).toContain("line 50 changed");
-		expect(settledRender).toContain("line 950 changed");
+		expect(settledRender).toContain("line 150 changed");
 		expect(settledRender).not.toContain("Successfully replaced");
 	});
 

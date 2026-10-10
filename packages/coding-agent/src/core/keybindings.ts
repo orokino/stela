@@ -65,16 +65,24 @@ const APP_KEYBINDINGS = {
 		description: "Open external editor",
 	},
 	"app.message.copy": {
-		defaultKeys: "ctrl+x",
+		defaultKeys: "alt+c",
 		description: "Copy selection or last assistant message",
 	},
 	"app.message.followUp": {
-		defaultKeys: windowsKeybindings ? "ctrl+q" : "alt+enter",
+		defaultKeys: windowsKeybindings ? ["ctrl+q", "ctrl+enter"] : ["alt+enter", "ctrl+enter"],
 		description: "Queue follow-up message",
 	},
 	"app.message.dequeue": {
-		defaultKeys: windowsKeybindings ? "alt+q" : "alt+up",
+		defaultKeys: windowsKeybindings ? ["alt+q", "shift+up"] : ["alt+up", "shift+up"],
 		description: "Restore queued messages",
+	},
+	"app.editor.pasteExpand": {
+		defaultKeys: windowsKeybindings ? "ctrl+shift+v" : ["alt+shift+v", "ctrl+shift+v"],
+		description: "Re-expand the most recent collapsed paste",
+	},
+	"app.shortcuts.toggle": {
+		defaultKeys: ["ctrl+x", "ctrl+."],
+		description: "Show keyboard shortcuts",
 	},
 	"app.clipboard.pasteImage": {
 		defaultKeys: windowsKeybindings ? "alt+v" : "ctrl+v",
@@ -246,10 +254,13 @@ const KEYBINDING_NAME_MIGRATIONS = {
 	toggleThinking: "app.thinking.toggle",
 	toggleSessionNamedFilter: "app.session.toggleNamedFilter",
 	externalEditor: "app.editor.external",
+	copyMessage: "app.message.copy",
+	pasteExpand: "app.editor.pasteExpand",
 	followUp: "app.message.followUp",
 	dequeue: "app.message.dequeue",
 	pasteImage: "app.clipboard.pasteImage",
 	newSession: "app.session.new",
+	shortcutsOverlay: "app.shortcuts.toggle",
 	tree: "app.session.tree",
 	fork: "app.session.fork",
 	resume: "app.session.resume",

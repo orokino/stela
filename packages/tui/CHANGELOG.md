@@ -5,7 +5,7 @@
 ### Breaking Changes
 
 - `Editor.render()` and `Input.render()` now wrap the drawn cursor in zero-width APC markers instead of emitting `\x1b[7m` directly. TUI renderers resolve them; code that renders these components outside a TUI must strip them, for example with `stripTerminalSequences()`
-- `Terminal` implementations must provide `notify(message)`; terminals without notification support can implement it as a no-op
+- Removed the `nerd` spinner preset: it was byte-identical to `unicode`, so `SpinnerPreset` is now `"unicode" | "ascii"`. Extensions passing `preset: "nerd"` fall back to the unicode braille frames at runtime.
 
 ### Added
 

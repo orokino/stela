@@ -5,7 +5,9 @@ import type { ToolExecutionComponent } from "./tool-execution.ts";
 /**
  * Collapsed view of 3+ consecutive read/search calls: one dim summary line
  * (`Explored — N reads, N searches`) that expands to the full cards on click
- * or when the transcript-wide `ctrl+o` toggle expands tool output.
+ * or when the transcript-wide `ctrl+o` toggle expands tool output. The expanded
+ * shell is a padding-only Box (identity bg, no tint — status stays in the head
+ * glyph + words).
  */
 export class ExploredGroupComponent extends Container {
 	private readonly cards: ToolExecutionComponent[];
@@ -43,7 +45,7 @@ export class ExploredGroupComponent extends Container {
 		this.clear();
 		this.addChild(new Spacer(1));
 		if (this.expanded) {
-			const box = new Box(1, 1, (text: string) => theme.bg("toolSuccessBg", text));
+			const box = new Box(1, 1, (text: string) => text);
 			for (const card of this.cards) {
 				box.addChild(card);
 			}

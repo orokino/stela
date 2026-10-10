@@ -163,11 +163,11 @@ On native Windows, `app.suspend` has no default because Windows terminals do not
 
 | Keybinding id | Default | Description |
 |--------|---------|-------------|
-| `app.tools.expand` | `ctrl+o` | Collapse or expand tool output |
-| `app.message.copy` | `ctrl+x` | Copy the selected message in `/tree`; in fullscreen mode, copy the active selection when `fullscreenCopyOnSelect` is `false`; otherwise copy the last assistant message. On OAuth sign-in screens, copy the sign-in URL |
-| `app.message.followUp` | `alt+enter` (`ctrl+q` on Windows and WSL) | Queue follow-up message |
-| `app.message.dequeue` | `alt+up` (`alt+q` on Windows and WSL) | Restore queued messages to editor |
-
+| `app.message.copy` | `alt+c` | Copy the selected message in `/tree`; in fullscreen mode, copy the active selection when `fullscreenCopyOnSelect` is `false`; otherwise copy the last assistant message. On OAuth sign-in screens, copy the sign-in URL |
+| `app.message.followUp` | `alt+enter`, `ctrl+enter` (`ctrl+q`, `ctrl+enter` on Windows and WSL) | Queue follow-up message |
+| `app.message.dequeue` | `alt+up`, `shift+up` (`alt+q`, `shift+up` on Windows and WSL) | Restore queued messages to editor |
+| `app.editor.pasteExpand` | `alt+shift+v`, `ctrl+shift+v` (`ctrl+shift+v` on Windows and WSL) | Re-expand the most recent collapsed paste (paste again to expand) |
+| `app.shortcuts.toggle` | `ctrl+x`, `ctrl+.` | Show the keyboard shortcuts overlay (`/hotkeys` prints the same list as text) |
 ### Tree Navigation
 
 | Keybinding id | Default | Description |

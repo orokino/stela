@@ -29,7 +29,9 @@ describe("Windows keybinding defaults", () => {
 
 		expect(KEYBINDINGS["app.clipboard.pasteImage"].defaultKeys).toBe(windowsKeybindings ? "alt+v" : "ctrl+v");
 		expect(KEYBINDINGS["tui.altScreen.search"].defaultKeys).toBe(windowsKeybindings ? "ctrl+f" : "ctrl+shift+f");
-		expect(KEYBINDINGS["app.message.followUp"].defaultKeys).toBe(windowsKeybindings ? "ctrl+q" : "alt+enter");
+		expect(KEYBINDINGS["app.message.followUp"].defaultKeys).toEqual(
+			windowsKeybindings ? ["ctrl+q", "ctrl+enter"] : ["alt+enter", "ctrl+enter"],
+		);
 		expect(KEYBINDINGS["app.model.cycleBackward"].defaultKeys).toBe(windowsKeybindings ? "alt+p" : "shift+ctrl+p");
 		expect(KEYBINDINGS["tui.editor.undo"].defaultKeys).toBe(
 			nativeWindows ? "ctrl+z" : windowsKeybindings ? "alt+z" : "ctrl+-",
@@ -40,7 +42,9 @@ describe("Windows keybinding defaults", () => {
 		expect(KEYBINDINGS["tui.altScreen.nextPrompt"].defaultKeys).toEqual(
 			windowsKeybindings ? "ctrl+down" : ["ctrl+shift+down", "ctrl+down"],
 		);
-		expect(KEYBINDINGS["app.message.dequeue"].defaultKeys).toBe(windowsKeybindings ? "alt+q" : "alt+up");
+		expect(KEYBINDINGS["app.message.dequeue"].defaultKeys).toEqual(
+			windowsKeybindings ? ["alt+q", "shift+up"] : ["alt+up", "shift+up"],
+		);
 	});
 });
 

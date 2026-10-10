@@ -163,4 +163,13 @@ describe("ProgramStatusReporter", () => {
 		reporter.reset();
 		expect(last()).toEqual({ state: "idle" });
 	});
+
+	it("tracks open dialogs for the title Action Required word", () => {
+		const { reporter } = setup();
+		expect(reporter.hasBlocked()).toBe(false);
+		reporter.setBlocked("extension-dialog", { kind: "question", message: "Pick one" });
+		expect(reporter.hasBlocked()).toBe(true);
+		reporter.setBlocked("extension-dialog", undefined);
+		expect(reporter.hasBlocked()).toBe(false);
+	});
 });

@@ -13,12 +13,11 @@ export interface LoaderIndicatorOptions {
 	animations?: boolean;
 }
 
-/** Spinner glyph preset: Cursor's two-cell braille, nerd-font, or ASCII (OMP U6 shape, CU U6 art). */
-export type SpinnerPreset = "unicode" | "nerd" | "ascii";
+/** Spinner glyph preset: Cursor's two-cell braille or ASCII (OMP U6 shape, CU U6 art). */
+export type SpinnerPreset = "unicode" | "ascii";
 
 export const SPINNER_PRESETS: Record<SpinnerPreset, { frames: string[]; intervalMs: number }> = {
 	unicode: { frames: ["⠈⠞", "⠠⠜", "⠰⠰", "⠘⠤", "⠘⠆", "⠘⠣", "⠰⠳", "⠠⠛"], intervalMs: 250 },
-	nerd: { frames: ["⠈⠞", "⠠⠜", "⠰⠰", "⠘⠤", "⠘⠆", "⠘⠣", "⠰⠳", "⠠⠛"], intervalMs: 250 },
 	ascii: { frames: ["|", "/", "-", "\\"], intervalMs: 250 },
 };
 
@@ -103,7 +102,10 @@ export class Loader extends Text {
 
 	setIndicator(indicator?: LoaderIndicatorOptions): void {
 		this.renderIndicatorVerbatim = indicator !== undefined;
-		const preset = indicator?.preset !== undefined ? SPINNER_PRESETS[indicator.preset] : undefined;
+		// The deleted `nerd` preset falls back to the unicode frames at runtime.
+		const rawPreset = indicator?.preset as SpinnerPreset | "nerd" | undefined;
+		const presetKey = rawPreset === "nerd" ? "unicode" : rawPreset;
+		const preset = presetKey !== undefined ? SPINNER_PRESETS[presetKey] : undefined;
 		this.frames =
 			indicator?.frames !== undefined
 				? [...indicator.frames]

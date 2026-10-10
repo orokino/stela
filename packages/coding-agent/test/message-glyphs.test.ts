@@ -2,7 +2,10 @@ import { setSymbolPreset } from "@earendil-works/pi-tui";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
 	formatThinkingLive,
+	formatThoughtCollapsed,
+	formatThoughtCollapsedDuration,
 	formatThoughtDuration,
+	formatTurnMetaLine,
 	MESSAGE_GLYPHS,
 	MESSAGE_GLYPHS_ASCII,
 	messageGlyph,
@@ -44,5 +47,24 @@ describe("message glyphs", () => {
 		expect(formatThinkingLive(0)).toBe("Thinking… 0s");
 		expect(formatThinkingLive(7000)).toBe("Thinking… 7s");
 		expect(formatThinkingLive(61000)).toBe("Thinking… 1m 01s");
+	});
+
+	it("collapses thinking to duration, count, and key on one line", () => {
+		expect(formatThoughtCollapsed("3s", 12, "ctrl+o")).toBe("+ Thought · 3s · 12 lines · ctrl+o to expand");
+		expect(formatThoughtCollapsed("<1s", 1, "ctrl+o")).toBe("+ Thought · <1s · 1 line · ctrl+o to expand");
+		expect(formatThoughtCollapsedDuration(3200)).toBe("3s");
+		setSymbolPreset("ascii");
+		try {
+			expect(formatThoughtCollapsed("3s", 2, "ctrl+o")).toContain("to expand");
+		} finally {
+			setSymbolPreset("unicode");
+		}
+	});
+
+	it("formats the transcript meta line as duration and tok/s without a model", () => {
+		expect(formatTurnMetaLine(3600, 27)).toBe("3.6s · 7.5 tok/s");
+		expect(formatTurnMetaLine(3200, undefined)).toBe("3.2s");
+		expect(formatTurnMetaLine(undefined, 100)).toBe("--");
+		expect(formatTurnMetaLine(3600, 27)).not.toContain("gpt");
 	});
 });

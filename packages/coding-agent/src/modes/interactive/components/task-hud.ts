@@ -8,13 +8,22 @@ export interface BackgroundShellRow {
 	startedAt: number;
 }
 
+/** A finished background shell kept as one dim `Finished "<command>"` row (CU U15). */
+export interface FinishedShellRow {
+	command: string;
+	finishedAt: number;
+}
+
 /**
  * Pinned task HUD above the composer: background shells, capped at 3 rows with an overflow tail
  * (OMP U15: `… N more — expand`, warn colour after 5 s). Empty renders nothing. Subagent rows and
  * the tabbed tray stay future: Stela ships no subagent/task tool yet, so there is nothing to list.
+ * Foreground `!` shells surface completion through their own tool card, so the `Finished` row is
+ * scoped to background (`!!`) completions only.
  */
 export class TaskHudComponent extends Container {
 	private shells: BackgroundShellRow[] = [];
+	private finished: FinishedShellRow[] = [];
 	private expanded = false;
 	private readonly outputPad: number;
 
@@ -25,6 +34,16 @@ export class TaskHudComponent extends Container {
 
 	setShells(shells: BackgroundShellRow[]): void {
 		this.shells = [...shells];
+		this.rebuild();
+	}
+
+	/**
+	 * Keep one dim `Finished "<command>"` row per background completion. Foreground `!`
+	 * shells keep no row: their tool card already shows the result in the transcript.
+	 */
+	addFinished(command: string): void {
+		this.finished.push({ command, finishedAt: Date.now() });
+		if (this.finished.length > 3) this.finished.splice(0, this.finished.length - 3);
 		this.rebuild();
 	}
 
@@ -41,19 +60,23 @@ export class TaskHudComponent extends Container {
 
 	private rebuild(): void {
 		this.clear();
-		if (this.shells.length === 0) return;
+		if (this.shells.length === 0 && this.finished.length === 0) return;
 		this.addChild(new Spacer(1));
 		const shown = this.expanded ? this.shells : this.shells.slice(0, 3);
 		for (const shell of shown) {
 			const elapsed = Math.max(0, Math.round((Date.now() - shell.startedAt) / 1000));
 			const warn = elapsed >= 5;
 			const glyph = pickSymbol("⏹", "[bg]");
-			const line = `${glyph} ${shell.name} ${shell.command} · ${elapsed}s`;
+			const line = `${glyph} ${shell.name} ${shell.command} ${pickSymbol("·", "/")} ${elapsed}s`;
 			this.addChild(new Text(theme.fg(warn ? "warning" : "dim", line), this.outputPad, 0));
 		}
 		const hidden = this.shells.length - shown.length;
 		if (hidden > 0 && !this.expanded) {
-			const label = new Text(theme.fg("dim", `… ${hidden} more — expand`), this.outputPad, 0);
+			const label = new Text(
+				theme.fg("dim", `${pickSymbol("…", "...")} ${hidden} more ${pickSymbol("—", "-")} expand`),
+				this.outputPad,
+				0,
+			);
 			this.addChild(
 				new MouseRegion(label, (event) => {
 					if (event.type !== "click" || event.button !== "left") return undefined;
@@ -61,6 +84,9 @@ export class TaskHudComponent extends Container {
 					return { handled: true };
 				}),
 			);
+		}
+		for (const done of this.finished) {
+			this.addChild(new Text(theme.fg("dim", `Finished "${done.command}"`), this.outputPad, 0));
 		}
 	}
 }

@@ -21,9 +21,19 @@ export function selectCurrentMark(): string {
 	return pickSymbol(SELECT_CURRENT_MARK, "*");
 }
 
-/** Height clamp: half the screen, min 6, max rows−3 (CC U9). */
+/** Height clamp: half the screen, min 6, max rows-3 (CC U9). */
 export function selectListHeight(rows: number): number {
 	return Math.max(1, Math.min(Math.max(6, Math.floor(rows / 2)), rows - 3));
+}
+
+/**
+ * Live-keybinding footer (OMP U9): composed from caller-supplied segments so
+ * the text always matches the live binding table and can never go stale.
+ * Segments are joined with ` · `; callers MUST pass pre-formatted keyHint text.
+ * Exported because six picker footers share this exact join in lockstep.
+ */
+export function selectListFooter(segments: string[]): string {
+	return segments.filter((segment) => segment.length > 0).join(" · ");
 }
 
 /** Overflow affordance: `↑ N more` / `↓ N more` joined by ` · ` (CC U9); empty when all fits. */

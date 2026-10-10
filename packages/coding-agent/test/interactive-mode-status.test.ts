@@ -156,6 +156,7 @@ describe("InteractiveMode.setToolsExpanded", () => {
 			chatContainer: { children: [chatChild] },
 			ui: { requestRender: vi.fn() },
 			showStatus: vi.fn(),
+			showLoadedResources: vi.fn(),
 		};
 
 		(InteractiveMode as any).prototype.setToolsExpanded.call(fakeThis, true);
@@ -539,6 +540,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 			toolOutputExpanded: options.toolOutputExpanded ?? false,
 			loadedResourcesContainer: new Container(),
 			chatContainer: new Container(),
+			ui: { terminal: { columns: 80, rows: 24 } },
 			settingsManager: {
 				getQuietStartup: () => options.quietStartup,
 			},

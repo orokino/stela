@@ -1,6 +1,7 @@
 import { pickSymbol } from "@earendil-works/pi-tui";
 import * as Diff from "diff";
 import { theme } from "../theme/theme.ts";
+import { keyHint } from "./keybinding-hints.ts";
 
 /**
  * Parse diff line to extract prefix, line number, and content.
@@ -96,6 +97,15 @@ export interface RenderDiffOptions {
 export const DIFF_COLLAPSED_LINES = 40;
 export const DIFF_COLLAPSED_HUNKS = 8;
 
+/**
+ * Edge-state copy for diffs that cannot be rendered as text (binary files, oversized
+ * previews that never materialised). CU U5 ships these as zero-chrome literals; keep
+ * them plain text so they survive nocolor, and keep the keep/undo affordance on the
+ * same line (the decision is still available even though the preview is not).
+ */
+export const DIFF_BINARY_HIDDEN_COPY = "Binary file diff hidden · You can still keep or undo this change.";
+export const DIFF_UNRENDERABLE_COPY = "Diff preview unavailable · You can still keep or undo this change.";
+
 function paintAdded(text: string): string {
 	const line = theme.fg("toolDiffAdded", text);
 	return theme.getColorMode() === "truecolor" ? theme.bg("toolDiffAddedBg", line) : line;
@@ -118,6 +128,10 @@ function paintRemoved(text: string): string {
  * truecolor only; signs carry the meaning everywhere else.
  */
 export function renderDiff(diffText: string, options: RenderDiffOptions = {}): string {
+	// Binary content (NUL bytes) never renders as text: CU's zero-chrome literal.
+	if (diffText.includes("\0")) {
+		return theme.fg("dim", DIFF_BINARY_HIDDEN_COPY);
+	}
 	const lines = diffText.split("\n");
 	const result: string[] = [];
 	let hunks = 0;
@@ -198,7 +212,9 @@ export function renderDiff(diffText: string, options: RenderDiffOptions = {}): s
 	const parts: string[] = [];
 	if (hiddenHunks > 0) parts.push(`${hiddenHunks} more hunk${hiddenHunks === 1 ? "" : "s"}`);
 	if (hiddenLines > 0) parts.push(`${hiddenLines} more line${hiddenLines === 1 ? "" : "s"}`);
-	shown.push(theme.fg("dim", `… (${parts.join(", ")})`));
+	shown.push(
+		theme.fg("dim", `${pickSymbol("…", "...")} (${parts.join(", ")}) ${keyHint("app.tools.expand", "to expand")}`),
+	);
 	return shown.join("\n");
 }
 

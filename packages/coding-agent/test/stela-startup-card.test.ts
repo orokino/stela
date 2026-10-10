@@ -45,8 +45,10 @@ describe("stela startup card", () => {
 	it("falls back to the narrow form when the frame does not fit", () => {
 		expect(stelaCardFits(57, 40)).toBe(false);
 		expect(stelaCardFits(120, 11)).toBe(false);
-		expect(stelaCardFits(60, 12)).toBe(true);
-		expect(stelaCardFits(120, 12)).toBe(true);
+		expect(stelaCardFits(89, 40)).toBe(false);
+		expect(stelaCardFits(90, 24)).toBe(false);
+		expect(stelaCardFits(90, 25)).toBe(true);
+		expect(stelaCardFits(120, 25)).toBe(true);
 		const narrow = card(50, 40).map(visible);
 		expect(narrow[0]).toMatch(/^[|▌] Stela {2}1\.1\.0$/);
 		expect(narrow.join("\n")).not.toContain("╭");

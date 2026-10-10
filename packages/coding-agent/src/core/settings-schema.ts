@@ -352,6 +352,20 @@ export const SettingsSchema = Type.Object(
 				default: SETTINGS_DEFAULTS.enableInstallTelemetry,
 			}),
 		),
+		telemetry: Type.Optional(
+			Type.Object(
+				{
+					showExtendedTelemetry: Type.Optional(
+						Type.Boolean({
+							description:
+								"Show the extended footer telemetry suffix (token counts, cache hit rate, cost, files edited). Off keeps only the context segment.",
+							default: SETTINGS_DEFAULTS.telemetry.showExtendedTelemetry,
+						}),
+					),
+				},
+				{ additionalProperties: false },
+			),
+		),
 		enableAnalytics: Type.Optional(
 			Type.Boolean({
 				description: "Opt in to analytics data sharing.",

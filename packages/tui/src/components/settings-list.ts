@@ -15,6 +15,12 @@ export interface SettingItem {
 	currentValue: string;
 	/** If provided, Enter/Space cycles through these values */
 	values?: string[];
+	/**
+	 * Inline typed-editor kind (CU U9 pager shell). When set and the item has
+	 * no `values` cycle and no `submenu`, Enter opens an inline value editor
+	 * instead of cycling: `value` prompts for a scalar, `json` for JSON text.
+	 */
+	editor?: "value" | "json";
 	/** If provided, Enter opens this submenu. Receives current value and done callback.
 	 *  done() accepts an optional selectedValue and an optional navigateTo id to move the cursor after close. */
 	submenu?: (
@@ -46,6 +52,9 @@ export class SettingsList implements Component {
 	private onCancel: () => void;
 	private searchInput?: Input;
 	private searchEnabled: boolean;
+	private pagerEditor: Input | undefined;
+	private pagerEditorItemId: string | undefined;
+	private pagerError: string | undefined;
 
 	// Submenu state
 	private submenuComponent: Component | null = null;
@@ -102,6 +111,11 @@ export class SettingsList implements Component {
 		return this.renderMainList(width);
 	}
 
+	/** True while an inline pager editor is open for the given setting id. */
+	isEditingInline(id: string): boolean {
+		return this.pagerEditorItemId === id && this.pagerEditor !== undefined;
+	}
+
 	private renderMainList(width: number): string[] {
 		const lines: string[] = [];
 
@@ -152,6 +166,14 @@ export class SettingsList implements Component {
 			const valueText = this.theme.value(truncateToWidth(item.currentValue, valueMaxWidth, ""), isSelected);
 
 			lines.push(truncateToWidth(prefix + labelText + separator + valueText, width));
+
+			// Inline pager editor (CU U9 shell): top-border-only row beneath the item.
+			if (isSelected && this.pagerEditor && this.pagerEditorItemId === item.id) {
+				for (const editorLine of this.pagerEditor.render(width - 4)) lines.push(`    ${editorLine}`);
+				const prompt = item.editor === "json" ? "Enter JSON" : "Enter value";
+				lines.push(this.theme.hint(truncateToWidth(`    ${prompt} · X unset · esc close`, width - 4, "")));
+				if (this.pagerError) lines.push(truncateToWidth(`    ${this.pagerError}`, width - 4, ""));
+			}
 		}
 
 		// Add scroll indicator if needed
@@ -227,6 +249,12 @@ export class SettingsList implements Component {
 			return;
 		}
 
+		// Inline pager editor takes all keys until Enter/Esc/X.
+		if (this.pagerEditor && this.pagerEditorItemId) {
+			this.handlePagerInput(data);
+			return;
+		}
+
 		// Main list input handling
 		const kb = getKeybindings();
 		const displayItems = this.getDisplayItems();
@@ -288,9 +316,64 @@ export class SettingsList implements Component {
 			const newValue = item.values[nextIndex];
 			item.currentValue = newValue;
 			this.onChange(item.id, newValue);
+		} else if (item.editor) {
+			this.openPagerEditor(item);
 		}
 	}
 
+	private openPagerEditor(item: SettingItem): void {
+		this.pagerEditor = new Input({ placeholder: item.editor === "json" ? "Enter JSON" : "Enter value" });
+		this.pagerEditor.setValue(item.currentValue === "(unset)" ? "" : item.currentValue);
+		this.pagerEditorItemId = item.id;
+		this.pagerError = undefined;
+		this.pagerEditor.onSubmit = (value) => this.commitPagerEditor(value);
+	}
+
+	private handlePagerInput(data: string): void {
+		const kb = getKeybindings();
+		if (kb.matches(data, "tui.select.cancel")) {
+			this.pagerEditor = undefined;
+			this.pagerEditorItemId = undefined;
+			this.pagerError = undefined;
+			return;
+		}
+		// X unsets the value (CU U9 `X unset`); only when the editor is empty
+		// so typing a value containing x/X still works.
+		if ((data === "x" || data === "X") && (this.pagerEditor?.getValue() ?? "") === "") {
+			const item = this.items.find((entry) => entry.id === this.pagerEditorItemId);
+			if (item) {
+				item.currentValue = "(unset)";
+				this.onChange(item.id, "");
+			}
+			this.pagerEditor = undefined;
+			this.pagerEditorItemId = undefined;
+			this.pagerError = undefined;
+			return;
+		}
+		this.pagerEditor?.handleInput(data);
+	}
+
+	private commitPagerEditor(value: string): void {
+		const item = this.items.find((entry) => entry.id === this.pagerEditorItemId);
+		if (!item) {
+			this.pagerEditor = undefined;
+			this.pagerEditorItemId = undefined;
+			return;
+		}
+		if (item.editor === "json") {
+			try {
+				JSON.parse(value);
+			} catch {
+				this.pagerError = "Invalid JSON - edit again or esc to close";
+				return;
+			}
+		}
+		item.currentValue = value;
+		this.onChange(item.id, value);
+		this.pagerEditor = undefined;
+		this.pagerEditorItemId = undefined;
+		this.pagerError = undefined;
+	}
 	private closeSubmenu(): void {
 		this.submenuComponent = null;
 		if (this.navigateAfterClose !== null) {

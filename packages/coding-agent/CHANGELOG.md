@@ -8,8 +8,9 @@
 - Moved the thinking-level cycle from `Shift+Tab` to `Alt+T`; `Shift+Tab` now cycles the permission mode. Both stay rebindable (`app.thinking.cycle`, `app.permissions.cycle`).
 - Removed the `plan-mode` example extension; plan mode is built in.
 - Cut over this fork to the `stela` command, `~/.stela/agent` global state, `.stela` project configuration, and Stela-specific directory overrides. Pi state is not imported automatically; upstream package names and persistence formats are retained.
-- Collapsed thinking blocks always render as `+ Thought · <duration>` with a live spinner row (`Thinking… <elapsed>`, ticking from `thinking_start`); `ctx.ui.setHiddenThinkingLabel()` is a no-op kept so old extensions still load, and the `hidden-thinking-label` example extension is removed.
 - Changed the default TUI mode from fullscreen to regular (inline): the transcript stays in real terminal scrollback; fullscreen remains available via `--tui-mode fullscreen` or the `tuiMode` setting, with the mouse off unless `fullscreenMouse` is enabled.
+- Rebound `app.message.copy` from `ctrl+x` to `alt+c`; `ctrl+x` (with `ctrl+.`) now opens the keyboard shortcuts overlay. Rebind `app.message.copy` back to `ctrl+x` in `keybindings.json` if the old chord is required.
+- Removed the `nerd` spinner preset (byte-identical to `unicode`); `SpinnerPreset` is `"unicode" | "ascii"` and `preset: "nerd"` falls back to unicode frames at runtime.
 
 ### Added
 
@@ -31,10 +32,21 @@
 - Added composer paste collapse past 800 chars or 2 lines into `[Pasted #N (+M lines)]`, `ctrl+r` incremental history search with a `reverse-i-search` border prompt, a `N queued` dock head with edit/send-now hints, `@`/`/` popups capped at 8 rows by default, and `alt+enter` as a third newline key.
 - Added a reserved-keys list (`ctrl+c/d`, `ctrl+v`, `shift+tab`, `escape`, `alt+arrows`) refused in user keybinding files, and a `fullscreenMouse` setting (default off): the mouse is never captured unless explicitly enabled in fullscreen mode.
 - Added opt-in desktop notifications (`notifications.mode`: `off`/`auto`/`bell`): one OSC 9 (or BEL) per turn for needs-input, turn-complete, and error, gated on unfocused terminals via `?1004h` unless `notifyWhenFocused` is set. The OSC 0 title always carries `[Working]`/`[Ready]`; OSC 7501 semantics are unchanged.
-- Added a `terminal.symbols` preset (`unicode`/`ascii`): ASCII renders `>`/`*` markers, `^/v N more`, `|/-\` spinner, `ok`/`fail`/`o` tool states, `i`/`!`/`x` notices, `ctx` + `(auto)` footer, `:` hunk breaks, and `-` dashes across every surface from steps 1–11.
-- Added a shared truncation table for all tool surfaces, a 30 fps frame budget, and a 7 MiB frame cap that rewrites pathological frames as a visible `Rebuilding…` state instead of growing unbounded. Large shell output keeps its `Full output: <path>` spool marker.
 - Added a pinned task HUD above the composer for running `!`/`!!` shells (capped at 3 rows, warning colour after 5 s, ASCII-aware). Todo strip, subagent rows, and the tabbed tray stay future: Stela ships no todo/subagent tool yet.
-
+- Added a one-row footer CX ladder (location left, context segment pinned right, opt-in telemetry suffix, ordered segment drops, Working slot while streaming; no model, mode, or hints).
+- Added a composer GK frame (bottom-border model/thinking/mode status, contextual persistent hint row beneath with live keys and unbound-aware skip, placeholder, caret gutter, `/` dropdown with live values, manual paste re-expand with `paste again to expand` wording).
+- Added the `telemetry.showExtendedTelemetry` opt-in setting (default off) for the footer token/cache/cost/files-edited suffix.
+- Added `app.editor.pasteExpand` (`alt+shift+v`/`ctrl+shift+v`), `app.shortcuts.toggle` (`ctrl+x`/`ctrl+.`), and universal `ctrl+enter` queue / `shift+up` dequeue secondaries; `?` stays text and `/hotkeys` prints the shortcut list.
+- Added the CC picker height clamp (`min(max(6, rows/2), rows-3)`) to the session, model, scoped-model, provider, config, and settings-submenu pickers, replacing fixed `maxVisible` heights; the standalone `stela config` selector keeps its signature and takes the same clamp from its terminal height.
+- Added search-on-overflow and live-keybinding footers to every picker: the search row only appears when the list exceeds its visible budget, and footers are composed from the live binding table (`selectListFooter`) so they cannot go stale. Settings-submenu footers now read `enter select · esc go back` from live keys.
+- Added an inline CU settings pager shell to the settings UI: `terminal.animations`, `terminal.symbols`, `notifications.mode`, `notifications.notifyWhenFocused`, and `fullscreenMouse` rows with `Enter value`/`Enter JSON`/`X unset` typed editors, plus `setNotificationMode`/`setNotifyWhenFocused` settings-manager setters. Rows render inline (top-border-only) so scrollback is preserved.
+- Added the CC stall ladder to the working row: elapsed time plus `still working` / `still checking` / `still alive` words at 10/45/300 s and a `running <tool> for <elapsed>` line once a tool passes 2 s, with zero new motion (Cursor frames and 250 ms cadence unchanged).
+- Added GK startup-card thresholds (framed card at 90+ cols AND 25+ rows, compact form otherwise) with the ASCII texture wired through the live symbol preset, keeping the mark, frame, menu drop order.
+- Added the CU `Finished "<command>"` task-HUD row for background (`!!`) shell completions only; foreground `!` shells surface completion through their tool card.
+- Added transcript diff hardening: Ansi16 drops add/remove backgrounds (signs keep the signal, pinned by test), collapsed tails end with a live `ctrl+o` expand hint, and binary/unrenderable diffs render CU zero-chrome literals with the keep/undo affordance.
+- Added S6 tool rows: untinted head + indented body (status stays in the glyph + words), live 100 ms shell elapsed timer, `exit N (signal)` status words, truncate-start paths, and explicit STELA-budget truncation tails.
+- Added the S7 transcript tail: muted `duration · tok/s` meta line (no model — the composer border owns it), muted `· interrupted` for aborts, and a `─── compaction · Nk in ───` divider with a compact token summary (CU tint untouched).
+- Added the S8 thinking collapse: `+ Thought · <duration> · <N> lines · <key> to expand` on all durations with a live-resolved key, plus a global `ctrl+o` transcript toggle that expands/collapses tool output and thinking runs together.
 ### Changed
 
 - Changed the `showHardwareCursor` setting to use only the terminal cursor instead of also drawing Pi's reverse-video cursor
@@ -46,6 +58,7 @@
 - Fixed Mistral streams being aborted mid-generation (e.g. during long thinking) after the request timeout; the timeout now applies only to waiting for response headers ([#10609](https://github.com/earendil-works/pi/issues/10609))
 - Fixed the docs and example READMEs still naming Pi, the `pi` command, and `~/.pi` paths.
 - Fixed the container and Termux install docs to use Stela's source checkout instead of an upstream Pi npm package.
+- Fixed the stuck `[Working]` window title: it now transitions to `[Ready]` on `agent_end`/`agent_settled`/dialog close, and shows a static spaced `[ ! ] Action Required` while a dialog waits (OSC 9/BEL, unfocused-only, per-turn coalescing unchanged).
 
 ## [1.1.0] - 2026-10-07
 
