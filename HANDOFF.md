@@ -42,11 +42,12 @@ one native executable with its own `~/.stela/agent` state. The Node-based comman
 first step, not the native package. Keep inherited persistence initially; defer a Stela
 SQLite migration, the desktop GUI, and the seven-target reverse-engineering sweep.
 
-Subagent preference (2026-10-09): **DeepSeek V4.1 Flash at max thinking, via the OpenCode Go provider, running in
-OMP**. Orca: `worker-start --agent omp --model opencode-go/deepseek-v4.1-flash:max` (OMP accepts `--model` but not
-`--effort`; the `:max` suffix is OMP's thinking-level selector, seen in `~/.omp/logs`). Check `launch.effective` in the
-receipt and report if model or thinking level differ; never substitute another model silently. Earlier workers in
-this handoff used `gpt-6-luna`.
+Subagent preference (2026-10-10): **muse spark 1.3 contributor** (user choice; replaces DeepSeek V4.1
+Flash). Orca model id `opencode-go/muse-spark-1.3-contributor` (matches this workstation's own model
+string; confirm the exact id and any thinking-level suffix from Orca before launching). Check
+`launch.effective` in the receipt and report if model or thinking level differ; never substitute
+another model silently. Earlier workers in this handoff used `gpt-6-luna`, then
+`opencode-go/deepseek-v4.1-flash:max`.
 
 ### Frozen visual tokens — shared by eventual TUI and GUI
 
@@ -260,3 +261,82 @@ Suggested opening prompt (UI/UX):
 > list for reverse engineering the other CLIs' TUIs (claude-code, codex, opencode, cursor-agent, omp,
 > grok, devin) and ask me to approve it before starting any worker. Workers: DeepSeek V4.1 Flash (max) via
 > OpenCode Go in OMP (see "Subagent preference"), one heavy worker at a time. Do not overload the machine.
+
+## Current work — UI/UX phase 1 (done 2026-10-10, commit `37c92ab45`)
+
+All 15 steps of `docs/research/uiux/PLAN.md` are implemented, live-verified in tmux, and pushed to
+`origin/main` (105 files, +2864/−456). Phase-1 RE covered 7 targets (claude-code, codex, opencode,
+omp, cursor-agent, grok, devin) with reports in `docs/research/uiux/<target>.md` (git-ignored);
+`DECISIONS.md` records the approved picks, `PLAN.md` the per-step evidence. `npm run check` is clean.
+Nothing after `37c92ab45` is committed.
+
+Shipped, per step: (1) colour-depth ladder truecolor/256/16/nocolor + `stela` theme; (2) framed
+startup card with provisional mark; (3) notice glyphs `ⓘ`/`⚠`/`■`, tinted user block,
+`+ Thought · <dur>` collapse + ticking live row; (4) shared tool-card head + `Explored` grouping;
+(5) diff grammar (40% word gate, `⋮` breaks, `+N/-M`, 40/8 collapse, truecolor-only backgrounds);
+(6) footer `◫ pct/window` + drop order + streaming slot; (7) Cursor spinner + presets + suppression;
+(8) select-list grammar (`❯`/`✔`, `↑/↓ N more`, fuzzy, 40% descriptions); (9) paste collapse,
+`ctrl+r` history search, queue dock, 8-row popups, `alt+enter`; (10) reserved keys + fullscreen-mouse
+opt-in; (11) opt-in OSC 9/BEL notifications + state-word titles; (12) ASCII symbol preset;
+(13) truncation table + frame budget + `Rebuilding…`; (14) task HUD for `!` shells (strip/tray
+deferred: no todo/subagent tool exists); (15) inline TUI default with fullscreen opt-in.
+
+User verdict (2026-10-10): Stela still falls short of the studied CLIs on UI/UX feel. Phase 1
+shipped the structure but under-stole the details.
+
+## Next: UI/UX overhaul, phase 2 (not started)
+
+Full-surface overhaul of footer, composer, menus, diffs, telemetry, and every other surface phase 1
+touched — steal the best from the 7 RE reports, never invent. Hard gate: the worker MUST present
+ranked options per surface and wait for the user's green light before implementing or editing
+anything. No code changes, no commits, no live edits until approval lands per surface or per batch,
+as the user directs at review time.
+
+How phase 2 runs:
+
+1. **Audit first.** For each surface (footer, composer, menus/pickers, diffs, telemetry, tool cards,
+   transcript rows, thinking, spinners/motion, notifications, startup card, task HUD, key hints),
+   the worker diffs Stela's current render against the best observed behavior in
+   `docs/research/uiux/<target>.md`, citing file + U-section per claim.
+2. **Ranked options.** Per surface: a ranked option table (observed options only, pros/cons, sources),
+   one recommended pick with reasoning, rejected alternatives. Combinations no single target ships
+   must be labelled **(synthesis)** and beat every observed option. Familiarity is never a tie-break;
+   ties go to simpler. Same criteria order as QUESTIONS.md (legibility → accessibility).
+3. **User review.** Present the tables; the user picks winners, possibly per surface. Only then does
+   implementation start, surface by surface, with live tmux proof per surface and `npm run check`
+   clean throughout.
+4. **Standing rules once approved:** verbatim technique only, never copied art/strings/prompts;
+   frozen visual tokens hold; ASCII + no-colour parity for every glyph that carries meaning; no new
+   dependencies without the repo-rule review; docs/changelog/schemas in the same step as the code.
+
+Known gaps to include in the audit (all have report anchors; the worker must still re-derive them,
+not trust this list blindly):
+
+1. **Startup card ASCII path is dead code.** `MARK_ASCII` exists but `interactive-mode.ts` never
+   passes `ascii: true`. Wire `getSymbolPreset()` into the card call (DV U13 shows the same bug
+   class). Narrow form never live-captured at 60×20/50×20.
+2. **Nerd spinner preset is a copy.** `SPINNER_PRESETS.nerd` reuses unicode braille. OMP U6 ships 12
+   private-use nerd frames — steal the art or delete the preset.
+3. **`selectListHeight()` exported but called nowhere.** Wire CC U9's clamp into session/model/theme
+   selectors (fixed `maxVisible` today).
+4. **Paste re-expand key missing.** CC U7 `paste again to expand`; OMP U7 `ctrl+shift+v`. Stela only
+   auto-expands on submit.
+5. **Cost/tokens never made the footer opt-in.** U8 pick says opt-in; steal CX U8 item vocabulary +
+   CU U8 `token% · files edited` row as a toggle.
+6. **Tool `Box` is still a tinted slab.** U1 pick says rules + one bottom block, hairlines only
+   (CX bottom pane, OMP pinned composer).
+7. **Settings UI hides the new knobs.** `terminal.animations`, `terminal.symbols`, `notifications.*`,
+   `fullscreenMouse` are settings-file-only (CU U9 pager shell is the pattern).
+8. **Working-indicator example doesn't demo presets** (docs drift).
+9. **Terminal matrix asserted, not captured.** Confirm OSC 9 `auto` vs `bell` on kitty + wezterm +
+   plain xterm (OMP/CU/DV U11 name them).
+10. **Stall ladder + `running tool for Xs` skipped** (CC 10s/45s/300s, CX 2s). The evidence of need is
+    the user saying the UI feels dead during long runs.
+
+Deferred (need tools/features that don't exist yet, not UI polish): todo strip + tabbed tray (no
+todo/subagent tool), full-screen diff viewer (needs `/diff` surface), screen-reader mode (design
+recorded in PLAN.md step 12), transcript search, user status-line command. Wordmark revisit still
+queued (A. Rubbing provisional).
+
+Worker for phase 2: **muse spark 1.3 contributor** (see "Subagent preference"). One heavy worker at a
+time; check `launch.effective`; never overload the machine.
