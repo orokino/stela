@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { deleteKittyImage, isImageLine } from "./terminal-image.ts";
-import { type TUI, TuiBase, type TuiStopOptions } from "./tui.ts";
+import { FRAME_BYTES_CAP, type TUI, TuiBase, type TuiStopOptions } from "./tui.ts";
 import { visibleWidth } from "./utils.ts";
 
 const KITTY_SEQUENCE_PREFIX = "\x1b_G";
@@ -263,6 +263,13 @@ export class TuiMainScreen extends TuiBase implements TUI {
 		// Render all components to get new lines
 		// Resolve fake cursors before compositing so overlays and line slicing see plain SGR codes
 		let newLines = this.resolveFakeCursors(this.render(width));
+
+		// Pathological frames (past the 7 MiB cap) rewrite as a visible `Rebuilding…` state
+		// instead of unbounded growth (OMP U14); the next frame renders normally.
+		const frameChars = newLines.reduce((total, line) => total + line.length, 0);
+		if (frameChars > FRAME_BYTES_CAP) {
+			newLines = ["↻ Rebuilding…"];
+		}
 
 		// Composite overlays into the rendered lines (before differential compare)
 		if (this.hasOverlayEntries) {

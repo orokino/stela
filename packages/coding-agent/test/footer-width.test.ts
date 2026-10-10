@@ -2,7 +2,11 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { AgentSession } from "../src/core/agent-session.ts";
 import type { ReadonlyFooterDataProvider } from "../src/core/footer-data-provider.ts";
-import { FooterComponent, formatCwdForFooter } from "../src/modes/interactive/components/footer.ts";
+import {
+	contextLevelForPercent,
+	FooterComponent,
+	formatCwdForFooter,
+} from "../src/modes/interactive/components/footer.ts";
 import { initTheme } from "../src/modes/interactive/theme/theme.ts";
 import { stripAnsi } from "../src/utils/ansi.ts";
 
@@ -26,6 +30,8 @@ function createSession(options: {
 	toolUsage?: AssistantUsage;
 	usingSubscription?: boolean;
 	routedModel?: { model: { id: string }; thinkingLevel?: string };
+	contextPercent?: number;
+	isStreaming?: boolean;
 }): AgentSession {
 	const usage = options.usage;
 	const entries: Array<Record<string, unknown>> = [];
@@ -82,7 +88,8 @@ function createSession(options: {
 			getSessionName: () => options.sessionName,
 			getCwd: () => "/tmp/project",
 		},
-		getContextUsage: () => ({ contextWindow: 200_000, percent: 12.3 }),
+		getContextUsage: () => ({ contextWindow: 200_000, percent: options.contextPercent ?? 12.3 }),
+		isStreaming: options.isStreaming ?? false,
 		routedModel: options.routedModel,
 		modelRuntime: {
 			isUsingSubscription: () => options.usingSubscription ?? false,
@@ -278,5 +285,44 @@ describe("FooterComponent width handling", () => {
 
 		expect(stats).toContain("$1.234");
 		expect(stats).not.toContain("(sub)");
+	});
+
+	it("encodes the context warning as glyph plus word, not colour alone", () => {
+		const render = (percent: number): string =>
+			stripAnsi(
+				new FooterComponent(
+					createSession({ sessionName: "", contextPercent: percent }),
+					createFooterData(1),
+				).render(120)[1],
+			);
+		expect(render(12.3)).toContain("◫ 12.3%/200k");
+		expect(render(12.3)).not.toContain("high");
+		expect(render(75)).toContain("◫ 75.0%/200k high");
+		expect(render(95)).toContain("◫ 95.0%/200k critical");
+	});
+
+	it("thresholds the context level at 70 and 90 percent", () => {
+		expect(contextLevelForPercent(70)).toBe("ok");
+		expect(contextLevelForPercent(70.1)).toBe("high");
+		expect(contextLevelForPercent(90)).toBe("high");
+		expect(contextLevelForPercent(90.1)).toBe("critical");
+	});
+
+	it("shows the running slot with the live interrupt hint while streaming", () => {
+		const footer = new FooterComponent(
+			createSession({ sessionName: "", modelId: "m1", isStreaming: true }),
+			createFooterData(1),
+		);
+		const stats = stripAnsi(footer.render(120)[1]);
+		expect(stats).toContain("Working");
+		expect(stats).toContain("to interrupt");
+		expect(stats).not.toContain("m1");
+	});
+
+	it("keeps the context segment at 40 columns", () => {
+		const footer = new FooterComponent(createSession({ sessionName: "", contextPercent: 42.5 }), createFooterData(1));
+		const lines = footer.render(40).map((line) => stripAnsi(line));
+		expect(lines.join("\n")).toContain("◫ 42.5%/200k");
+		for (const line of lines) expect(visibleWidth(line)).toBeLessThanOrEqual(40);
 	});
 });

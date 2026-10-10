@@ -7,7 +7,10 @@ import {
 	Input,
 	Key,
 	matchesKey,
+	SELECT_MARKER,
+	SELECT_SEARCH_PLACEHOLDER,
 	Spacer,
+	selectListOverflow,
 	Text,
 } from "@earendil-works/pi-tui";
 import { getModelSearchText } from "../model-search.ts";
@@ -141,7 +144,7 @@ export class ScopedModelsSelectorComponent extends Container implements Focusabl
 		this.addChild(new Spacer(1));
 
 		// Search input
-		this.searchInput = new Input();
+		this.searchInput = new Input({ placeholder: SELECT_SEARCH_PLACEHOLDER });
 		this.addChild(this.searchInput);
 		this.addChild(new Spacer(1));
 
@@ -248,7 +251,7 @@ export class ScopedModelsSelectorComponent extends Container implements Focusabl
 		for (let i = startIndex; i < endIndex; i++) {
 			const item = this.filteredItems[i]!;
 			const isSelected = i === this.selectedIndex;
-			const prefix = isSelected ? theme.fg("accent", "→ ") : "  ";
+			const prefix = isSelected ? theme.fg("accent", `${SELECT_MARKER} `) : "  ";
 			const id = item.model?.id ?? item.fullId;
 			const styledId = item.model ? id : theme.strikethrough(id);
 			const modelText = isSelected ? theme.fg("accent", styledId) : styledId;
@@ -257,11 +260,10 @@ export class ScopedModelsSelectorComponent extends Container implements Focusabl
 			this.listContainer.addChild(new Text(`${prefix}${status}${modelText}${providerBadge}`, 0, 0));
 		}
 
-		// Add scroll indicator if needed
-		if (startIndex > 0 || endIndex < this.filteredItems.length) {
-			this.listContainer.addChild(
-				new Text(theme.fg("muted", `  (${this.selectedIndex + 1}/${this.filteredItems.length})`), 0, 0),
-			);
+		// Overflow affordance: `↑ N more` / `↓ N more` joined by ` · ` (CC U9).
+		const overflow = selectListOverflow(startIndex, endIndex, this.filteredItems.length);
+		if (overflow) {
+			this.listContainer.addChild(new Text(theme.fg("muted", overflow), 0, 0));
 		}
 
 		if (this.filteredItems.length > 0) {

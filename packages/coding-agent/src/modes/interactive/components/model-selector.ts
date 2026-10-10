@@ -5,7 +5,10 @@ import {
 	fuzzyFilter,
 	getKeybindings,
 	Input,
+	SELECT_MARKER,
+	SELECT_SEARCH_PLACEHOLDER,
 	Spacer,
+	selectListOverflow,
 	Text,
 	type TUI,
 } from "@earendil-works/pi-tui";
@@ -113,7 +116,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		this.addChild(new Spacer(1));
 
 		// Create search input
-		this.searchInput = new Input();
+		this.searchInput = new Input({ placeholder: SELECT_SEARCH_PLACEHOLDER });
 		if (initialSearchInput) {
 			this.searchInput.setValue(initialSearchInput);
 		}
@@ -322,7 +325,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 			const isDefault = this.isDefaultModel(item.model);
 			const defaultBadge = isDefault ? theme.fg("muted", " · default") : "";
 
-			const cursor = isSelected ? theme.fg("accent", "→ ") : "  ";
+			const cursor = isSelected ? theme.fg("accent", `${SELECT_MARKER} `) : "  ";
 			const currentMarker = isCurrent ? theme.fg("accent", "✓ ") : "  ";
 			const modelText = isSelected ? theme.fg("accent", item.id) : item.id;
 			const providerBadge = theme.fg("muted", `[${item.provider}]`);
@@ -331,10 +334,10 @@ export class ModelSelectorComponent extends Container implements Focusable {
 			this.listContainer.addChild(new Text(line, 0, 0));
 		}
 
-		// Add scroll indicator if needed
-		if (startIndex > 0 || endIndex < this.filteredModels.length) {
-			const scrollInfo = theme.fg("muted", `  (${this.selectedIndex + 1}/${this.filteredModels.length})`);
-			this.listContainer.addChild(new Text(scrollInfo, 0, 0));
+		// Overflow affordance: `↑ N more` / `↓ N more` joined by ` · ` (CC U9).
+		const overflow = selectListOverflow(startIndex, endIndex, this.filteredModels.length);
+		if (overflow) {
+			this.listContainer.addChild(new Text(theme.fg("muted", overflow), 0, 0));
 		}
 
 		// Show error message or "no results" if empty

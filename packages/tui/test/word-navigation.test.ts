@@ -123,7 +123,7 @@ describe("findWordForward", () => {
 });
 
 describe("atomic segments", () => {
-	const marker = "[paste #1 +5 lines]";
+	const marker = "[Pasted #1 (+5 lines)]";
 	const text = `hello ${marker} world`;
 	const isAtomic = (s: string) => s === marker;
 
@@ -136,38 +136,38 @@ describe("atomic segments", () => {
 				{ segment: "hello", index: 0, input: text, isWordLike: true },
 				{ segment: " ", index: 5, input: text, isWordLike: false },
 				{ segment: marker, index: 6, input: text, isWordLike: true },
-				{ segment: " ", index: 25, input: text, isWordLike: false },
-				{ segment: "world", index: 26, input: text, isWordLike: true },
+				{ segment: " ", index: 28, input: text, isWordLike: false },
+				{ segment: "world", index: 29, input: text, isWordLike: true },
 			],
 		],
 		[
-			// backward from end: slice(0, 31) = full text
+			// backward from end: slice(0, 34) = full text
 			text.slice(0, text.length),
 			[
 				{ segment: "hello", index: 0, input: text, isWordLike: true },
 				{ segment: " ", index: 5, input: text, isWordLike: false },
 				{ segment: marker, index: 6, input: text, isWordLike: true },
-				{ segment: " ", index: 25, input: text, isWordLike: false },
-				{ segment: "world", index: 26, input: text, isWordLike: true },
+				{ segment: " ", index: 28, input: text, isWordLike: false },
+				{ segment: "world", index: 29, input: text, isWordLike: true },
 			],
 		],
 		[
-			// backward from 26: slice(0, 26) = "hello [paste #1 +5 lines] "
-			text.slice(0, 26),
+			// backward from 29: slice(0, 29) = "hello [Pasted #1 (+5 lines)] "
+			text.slice(0, 29),
 			[
 				{ segment: "hello", index: 0, input: text, isWordLike: true },
 				{ segment: " ", index: 5, input: text, isWordLike: false },
 				{ segment: marker, index: 6, input: text, isWordLike: true },
-				{ segment: " ", index: 25, input: text, isWordLike: false },
+				{ segment: " ", index: 28, input: text, isWordLike: false },
 			],
 		],
 		[
-			// forward from 6: slice(6) = "[paste #1 +5 lines] world"
+			// forward from 6: slice(6) = "[Pasted #1 (+5 lines)] world"
 			text.slice(6),
 			[
 				{ segment: marker, index: 0, input: text, isWordLike: true },
-				{ segment: " ", index: 19, input: text, isWordLike: false },
-				{ segment: "world", index: 20, input: text, isWordLike: true },
+				{ segment: " ", index: 22, input: text, isWordLike: false },
+				{ segment: "world", index: 23, input: text, isWordLike: true },
 			],
 		],
 	]);
@@ -178,11 +178,11 @@ describe("atomic segments", () => {
 	};
 
 	it("backward skips word then stops before atomic marker", () => {
-		assert.strictEqual(findWordBackward(text, text.length, opts), 26);
+		assert.strictEqual(findWordBackward(text, text.length, opts), 29);
 	});
 
 	it("backward skips whitespace then atomic marker as one unit", () => {
-		assert.strictEqual(findWordBackward(text, 26, opts), 6);
+		assert.strictEqual(findWordBackward(text, 29, opts), 6);
 	});
 
 	it("forward skips atomic marker as one unit", () => {

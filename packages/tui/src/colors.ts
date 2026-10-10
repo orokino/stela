@@ -22,7 +22,7 @@ export interface OklchColorValue {
 
 /** A concrete color. Every color can be converted to sRGB, so color math never fails. */
 export type Color = IndexedColor | RgbColorValue | OklchColorValue;
-export type TerminalColorMode = "256color" | "truecolor";
+export type TerminalColorMode = "truecolor" | "256color" | "16color" | "nocolor";
 export type ColorMixSpace = "oklch" | "srgb";
 
 export interface OklchChannels {
@@ -296,12 +296,46 @@ function rgbToAnsi256(color: RgbColor): number {
 	return cubeIndex;
 }
 
+/**
+ * Nearest basic ANSI colour for a terminal without 256-colour support: 0-7 normal, 8-15 bright.
+ * Saturated colours map by hue with a brightness step; near-greys (low chroma) map to black, bright
+ * black, silver or bright white by luminance. Nearest-RGB alone is not used because it maps light
+ * indigo accents to grey, which loses the accent's job.
+ */
+function rgbToAnsi16(color: RgbColor): number {
+	const max = Math.max(color.r, color.g, color.b);
+	const min = Math.min(color.r, color.g, color.b);
+	if (max - min < 32) {
+		const luminance = 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
+		if (luminance < 64) return 0;
+		if (luminance < 160) return 8;
+		if (luminance < 224) return 7;
+		return 15;
+	}
+	const bright = max >= 160 ? 8 : 0;
+	if (color.r >= 128 && color.g >= 128) return bright + 3;
+	if (color.r >= 128 && color.b >= 128) return bright + 5;
+	if (color.g >= 128 && color.b >= 128) return bright + 6;
+	if (color.r >= 128) return bright + 1;
+	if (color.g >= 128) return bright + 2;
+	return bright + 4;
+}
+
 function colorAnsi(color: Color, mode: TerminalColorMode, background: boolean): string {
-	if (color.kind === "indexed") return `\x1b[${background ? 48 : 38};5;${color.index}m`;
+	// Colour level "none": emit no SGR at all; callers keep weight, glyphs and reverse video.
+	if (mode === "nocolor") return "";
+	// An indexed colour stays indexed on a colour-capable terminal; only the 16-colour level maps it.
+	if (color.kind === "indexed" && mode !== "16color") {
+		return `\x1b[${background ? 48 : 38};5;${color.index}m`;
+	}
 
 	const rgb = colorToRgb(color);
 	if (mode === "truecolor") {
 		return `\x1b[${background ? 48 : 38};2;${Math.round(rgb.r)};${Math.round(rgb.g)};${Math.round(rgb.b)}m`;
+	}
+	if (mode === "16color") {
+		const index = rgbToAnsi16(rgb);
+		return index < 8 ? `\x1b[${background ? 4 : 3}${index}m` : `\x1b[${background ? 10 : 9}${index - 8}m`;
 	}
 	return `\x1b[${background ? 48 : 38};5;${rgbToAnsi256(rgb)}m`;
 }

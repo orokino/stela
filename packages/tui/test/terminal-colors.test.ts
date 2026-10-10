@@ -63,6 +63,7 @@ class TestTerminal implements Terminal {
 	clearScreen(): void {}
 
 	setTitle(_title: string): void {}
+	notify(_message: string): void {}
 
 	setProgress(_active: boolean): void {}
 	setProgramStatus(): void {}

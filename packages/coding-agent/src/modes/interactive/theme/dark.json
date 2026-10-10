@@ -52,6 +52,8 @@
 		"toolDiffAdded": "green",
 		"toolDiffRemoved": "red",
 		"toolDiffContext": "muted",
+		"toolDiffAddedBg": "okhsl(158 46% 18%)",
+		"toolDiffRemovedBg": "okhsl(19 54% 18%)",
 		"syntaxComment": "muted",
 		"syntaxKeyword": "blue",
 		"syntaxFunction": "yellow",

@@ -10,25 +10,27 @@ import { Text } from "@earendil-works/pi-tui";
 import { keyHint } from "../../../modes/interactive/components/keybinding-hints.ts";
 import type { Theme } from "../../../modes/interactive/theme/theme.ts";
 import type { ToolDefinition, ToolRenderResultOptions } from "../../extensions/types.ts";
-import type { FindToolDetails } from "../find.ts";
-import { getTextOutput, invalidArgText, shortenPath, str } from "../render-utils.ts";
+import type { FindToolDetails, FindToolInput } from "../find.ts";
+import { formatToolHead, getTextOutput, invalidArgText, shortenPath, str, toolHeadStatus } from "../render-utils.ts";
 import { DEFAULT_MAX_BYTES, formatSize } from "../truncate.ts";
+import { TRUNCATION_TABLE } from "../truncation-table.ts";
 
-function formatFindCall(args: { pattern: string; path?: string; limit?: number } | undefined, theme: Theme): string {
+function formatFindCall(
+	args: { pattern: string; path?: string; limit?: number } | undefined,
+	theme: Theme,
+	status: "running" | "ok" | "error",
+	meta?: string,
+): string {
 	const pattern = str(args?.pattern);
 	const rawPath = str(args?.path);
 	const path = rawPath !== null ? shortenPath(rawPath || ".") : null;
 	const limit = args?.limit;
 	const invalidArg = invalidArgText(theme);
-	let text =
-		theme.fg("toolTitle", theme.bold("find")) +
-		" " +
-		(pattern === null ? invalidArg : theme.fg("accent", pattern || "")) +
-		theme.fg("toolOutput", ` in ${path === null ? invalidArg : path}`);
+	let primaryArg = `${pattern === null ? invalidArg : pattern || ""} in ${path === null ? invalidArg : path}`;
 	if (limit !== undefined) {
-		text += theme.fg("toolOutput", ` (limit ${limit})`);
+		primaryArg += ` (limit ${limit})`;
 	}
-	return text;
+	return formatToolHead({ theme, status, verb: "find", primaryArg, meta });
 }
 function formatFindResult(
 	result: {
@@ -43,7 +45,7 @@ function formatFindResult(
 	let text = "";
 	if (output) {
 		const lines = output.split("\n");
-		const maxLines = options.expanded ? lines.length : 20;
+		const maxLines = options.expanded ? lines.length : TRUNCATION_TABLE.findCollapsed;
 		const displayLines = lines.slice(0, maxLines);
 		const remaining = lines.length - maxLines;
 		text += `\n${displayLines.map((line) => theme.fg("toolOutput", line)).join("\n")}`;
@@ -66,7 +68,13 @@ function formatFindResult(
 export const findRenderers: Pick<ToolDefinition<any, any>, "renderCall" | "renderResult"> = {
 	renderCall(args, theme, context) {
 		const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
-		text.setText(formatFindCall(args as any, theme));
+		const status = toolHeadStatus(context);
+		const details = context.resultDetails as FindToolDetails | undefined;
+		const meta =
+			details?.resultCount !== undefined
+				? `${details.resultCount} file${details.resultCount === 1 ? "" : "s"}`
+				: undefined;
+		text.setText(formatFindCall(args as FindToolInput | undefined, theme, status, meta));
 		return text;
 	},
 	renderResult(result, options, theme, context) {

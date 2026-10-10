@@ -3,10 +3,10 @@ import { describe, it } from "node:test";
 import { KeybindingsManager, TUI_KEYBINDINGS } from "../src/keybindings.ts";
 
 describe("KeybindingsManager", () => {
-	it("binds Ctrl+J as a default newline alias", () => {
+	it("binds Ctrl+J and Alt+Enter as default newline aliases", () => {
 		const keybindings = new KeybindingsManager(TUI_KEYBINDINGS);
 
-		assert.deepStrictEqual(keybindings.getKeys("tui.input.newLine"), ["shift+enter", "ctrl+j"]);
+		assert.deepStrictEqual(keybindings.getKeys("tui.input.newLine"), ["shift+enter", "ctrl+j", "alt+enter"]);
 		assert.strictEqual(keybindings.matches("\n", "tui.input.newLine"), true);
 		assert.strictEqual(keybindings.matches("\x1b[106;5u", "tui.input.newLine"), true);
 	});

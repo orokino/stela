@@ -296,12 +296,15 @@ export class Theme {
 
 	fg(color: ThemeColor, text: string): string {
 		const ansi = this.tokenAnsi(this.fgAnsi, color);
+		// Colour level "none" resolves tokens to ""; emit no colour sequence and no colour reset.
+		if (ansi === "") return this.dimTokens.has(color) ? `\x1b[2m${text}\x1b[22m` : text;
 		if (this.dimTokens.has(color)) return `${ansi}\x1b[2m${text}\x1b[22;39m`;
 		return `${ansi}${text}\x1b[39m`;
 	}
 
 	bg(color: ThemeBg, text: string): string {
 		const ansi = this.tokenAnsi(this.bgAnsi, color);
+		if (ansi === "") return text;
 		return `${ansi}${text}\x1b[49m`;
 	}
 
@@ -383,9 +386,12 @@ function getBuiltinThemes(): Record<string, ThemeJson> {
 		const themesDir = getThemesDir();
 		const darkPath = path.join(themesDir, "dark.json");
 		const lightPath = path.join(themesDir, "light.json");
+		const stelaPath = path.join(themesDir, "stela.json");
 		BUILTIN_THEMES = {
 			dark: JSON.parse(stripBom(fs.readFileSync(darkPath, "utf-8"))) as ThemeJson,
 			light: JSON.parse(stripBom(fs.readFileSync(lightPath, "utf-8"))) as ThemeJson,
+			// Stela's own palette (frozen tokens); a sibling file so upstream themes stay untouched.
+			stela: JSON.parse(stripBom(fs.readFileSync(stelaPath, "utf-8"))) as ThemeJson,
 		};
 	}
 	return BUILTIN_THEMES;

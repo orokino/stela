@@ -10,6 +10,8 @@ export interface TerminalCapabilities {
 	images: ImageProtocol;
 	trueColor: boolean;
 	hyperlinks: boolean;
+	/** Colour depth resolved from the environment; `trueColor` stays for image/hyperlink decisions. */
+	colorMode?: TerminalColorMode;
 }
 
 export interface CellDimensions {
@@ -143,6 +145,38 @@ function parseBooleanCapabilityOverride(value: string | undefined): boolean | un
 	return value === "1" ? true : value === "0" ? false : undefined;
 }
 
+/**
+ * Colour depth, most specific signal first: `PI_COLOR_MODE`, `NO_COLOR`, `TERM=dumb`, an already
+ * detected truecolour capability or a truecolour hint, 256-colour TERMs, the 16-colour terminal
+ * families, and 256 colours for anything else (unchanged from before so no terminal is downgraded by
+ * surprise). Layout never depends on this; only SGR does.
+ */
+export function resolveColorMode(env: NodeJS.ProcessEnv = process.env, trueColorHint = false): TerminalColorMode {
+	const override = env.PI_COLOR_MODE?.toLowerCase();
+	if (override === "truecolor" || override === "256color" || override === "16color" || override === "nocolor") {
+		return override;
+	}
+	const noColor = env.NO_COLOR;
+	if (typeof noColor === "string" && noColor !== "") return "nocolor";
+	const term = env.TERM?.toLowerCase() ?? "";
+	if (term === "dumb") return "nocolor";
+	const colorTerm = env.COLORTERM?.toLowerCase() ?? "";
+	if (trueColorHint || colorTerm === "truecolor" || colorTerm === "24bit" || term.endsWith("-direct")) {
+		return "truecolor";
+	}
+	if (term.includes("256color")) return "256color";
+	if (
+		term === "ansi" ||
+		term === "linux" ||
+		term.startsWith("vt10") ||
+		term.startsWith("vt22") ||
+		term.endsWith("-16color")
+	) {
+		return "16color";
+	}
+	return "256color";
+}
+
 export function detectCapabilities(tmuxForwardsHyperlink: () => boolean = probeTmuxHyperlinks): TerminalCapabilities {
 	const hyperlinks = parseBooleanCapabilityOverride(process.env.PI_HYPERLINKS);
 	const detected = detectCapabilitiesFromEnvironment(
@@ -156,27 +190,56 @@ export function detectCapabilities(tmuxForwardsHyperlink: () => boolean = probeT
 				? null
 				: undefined;
 	const trueColor = parseBooleanCapabilityOverride(process.env.PI_TRUE_COLOR);
+	// PI_COLOR_MODE wins outright; PI_TRUE_COLOR only upgrades or downgrades the truecolour step.
+	const resolvedColorMode = resolveColorMode(process.env, detected.trueColor);
+	const colorMode =
+		process.env.PI_COLOR_MODE !== undefined
+			? resolvedColorMode
+			: trueColor === true
+				? "truecolor"
+				: trueColor === false && resolvedColorMode === "truecolor"
+					? "256color"
+					: resolvedColorMode;
 	return {
 		...detected,
 		...(images !== undefined ? { images } : {}),
 		...(trueColor !== undefined ? { trueColor } : {}),
 		...(hyperlinks !== undefined ? { hyperlinks } : {}),
+		colorMode,
 	};
+}
+
+/**
+ * Merge detected capabilities with overrides. A `trueColor` override moves the colour mode with it,
+ * unless `colorMode` is set explicitly; this keeps the `terminal.trueColor` setting authoritative.
+ */
+export function mergeCapabilityOverrides(
+	detected: TerminalCapabilities,
+	overrides: Partial<TerminalCapabilities>,
+): TerminalCapabilities {
+	const merged = { ...detected, ...overrides };
+	if (overrides.colorMode === undefined) {
+		if (overrides.trueColor === true) merged.colorMode = "truecolor";
+		else if (overrides.trueColor === false && merged.colorMode === "truecolor") {
+			merged.colorMode = "256color";
+		}
+	}
+	return merged;
 }
 
 export function getCapabilities(): TerminalCapabilities {
 	if (!cachedCapabilities) {
 		const hyperlinks = capabilityOverrides.hyperlinks;
-		cachedCapabilities = {
-			...detectCapabilities(hyperlinks === undefined ? undefined : () => hyperlinks),
-			...capabilityOverrides,
-		};
+		cachedCapabilities = mergeCapabilityOverrides(
+			detectCapabilities(hyperlinks === undefined ? undefined : () => hyperlinks),
+			capabilityOverrides,
+		);
 	}
 	return cachedCapabilities;
 }
 
 export function getTerminalColorMode(capabilities: TerminalCapabilities = getCapabilities()): TerminalColorMode {
-	return capabilities.trueColor ? "truecolor" : "256color";
+	return capabilities.colorMode ?? (capabilities.trueColor ? "truecolor" : "256color");
 }
 
 export function resetCapabilitiesCache(): void {
@@ -188,7 +251,8 @@ export function setCapabilityOverrides(overrides: Partial<TerminalCapabilities>)
 	if (
 		capabilityOverrides.images === overrides.images &&
 		capabilityOverrides.trueColor === overrides.trueColor &&
-		capabilityOverrides.hyperlinks === overrides.hyperlinks
+		capabilityOverrides.hyperlinks === overrides.hyperlinks &&
+		capabilityOverrides.colorMode === overrides.colorMode
 	) {
 		return;
 	}

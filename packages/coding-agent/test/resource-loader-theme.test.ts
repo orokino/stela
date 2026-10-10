@@ -24,6 +24,11 @@ describe("DefaultResourceLoader theme color mode", () => {
 	let themeJson: TestThemeJson;
 
 	beforeEach(() => {
+		// Colour rendering is under test, so the ambient terminal environment of the harness must not leak in.
+		vi.stubEnv("NO_COLOR", undefined);
+		vi.stubEnv("PI_COLOR_MODE", undefined);
+		vi.stubEnv("COLORTERM", undefined);
+		vi.stubEnv("TERM", "xterm-256color");
 		tempDir = mkdtempSync(join(tmpdir(), "resource-loader-theme-"));
 		agentDir = join(tempDir, "agent");
 		cwd = join(tempDir, "project");

@@ -10,7 +10,15 @@ import { Container, Text } from "@earendil-works/pi-tui";
 import { keyHint } from "../../../modes/interactive/components/keybinding-hints.ts";
 import { getLanguageFromPath, highlightCode, type Theme } from "../../../modes/interactive/theme/theme.ts";
 import type { ToolDefinition, ToolRenderResultOptions } from "../../extensions/types.ts";
-import { normalizeDisplayText, renderToolPath, replaceTabs, str } from "../render-utils.ts";
+import {
+	formatToolHead,
+	normalizeDisplayText,
+	renderToolPath,
+	replaceTabs,
+	str,
+	toolHeadStatus,
+} from "../render-utils.ts";
+import { TRUNCATION_TABLE } from "../truncation-table.ts";
 
 type WriteHighlightCache = {
 	rawPath: string | null;
@@ -99,11 +107,13 @@ function formatWriteCall(
 	theme: Theme,
 	cache: WriteHighlightCache | undefined,
 	cwd: string,
+	status: "running" | "ok" | "error",
+	meta?: string,
 ): string {
 	const rawPath = str(args?.file_path ?? args?.path);
 	const fileContent = str(args?.content);
 	const pathDisplay = renderToolPath(rawPath, theme, cwd);
-	let text = `${theme.fg("toolTitle", theme.bold("write"))} ${pathDisplay}`;
+	let text = formatToolHead({ theme, status, verb: "write", primaryArg: pathDisplay, meta });
 
 	if (fileContent === null) {
 		text += `\n\n${theme.fg("error", "[invalid content arg - expected string]")}`;
@@ -114,7 +124,7 @@ function formatWriteCall(
 			: normalizeDisplayText(fileContent).split("\n");
 		const lines = trimTrailingEmptyLines(renderedLines);
 		const totalLines = lines.length;
-		const maxLines = options.expanded ? lines.length : 10;
+		const maxLines = options.expanded ? lines.length : TRUNCATION_TABLE.listCollapsed;
 		const displayLines = lines.slice(0, maxLines);
 		const remaining = lines.length - maxLines;
 		text += `\n\n${displayLines.map((line) => (lang ? line : theme.fg("toolOutput", replaceTabs(line)))).join("\n")}`;
@@ -163,6 +173,7 @@ export const writeRenderers: Pick<ToolDefinition<any, any>, "renderCall" | "rend
 				theme,
 				component.cache,
 				context.cwd,
+				toolHeadStatus(context),
 			),
 		);
 		return component;

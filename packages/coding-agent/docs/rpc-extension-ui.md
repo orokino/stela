@@ -15,7 +15,7 @@ Some `ExtensionUIContext` methods are not supported or degraded in RPC mode beca
 
 - `custom()` returns `undefined`.
 - `onTerminalInput()` returns a no-op unsubscribe function.
-- `setWorkingMessage()`, `setWorkingVisible()`, `setWorkingIndicator()`, `setHiddenThinkingLabel()`, `setFooter()`, `setHeader()`, `addAutocompleteProvider()`, `setEditorComponent()`, and `setToolsExpanded()` are no-ops.
+- `setWorkingMessage()`, `setWorkingVisible()`, `setWorkingIndicator()`, `setFooter()`, `setHeader()`, `addAutocompleteProvider()`, `setEditorComponent()`, and `setToolsExpanded()` are no-ops. `setHiddenThinkingLabel()` is a no-op in every mode: collapsed thinking always shows `Thought · <duration>`.
 - `getEditorText()` returns `""` and `getEditorComponent()` returns `undefined`.
 - `getToolsExpanded()` returns `false`.
 - `pasteToEditor()` delegates to `setEditorText()` without terminal paste handling.

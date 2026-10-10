@@ -158,6 +158,10 @@ type PendingTerminalColorQuery = {
 };
 
 const TERMINAL_PALETTE_SIZE = 16;
+/** 30 fps frame budget (OMP U14); slower frames defer non-critical work to the next frame. */
+export const FRAME_BUDGET_MS = 33;
+/** Frame-buffer cap before the overflow rewrite; mirrors OMP's 7 MiB guard (OMP U14). */
+export const FRAME_BYTES_CAP = 7 * 1024 * 1024;
 /** OSC 10 and 11 plus OSC 4 for every palette color. */
 const TERMINAL_COLOR_REPLY_COUNT = 2 + TERMINAL_PALETTE_SIZE;
 /**

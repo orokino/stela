@@ -96,6 +96,19 @@ const TerminalSettingsSchema = Type.Object({
 			default: SETTINGS_DEFAULTS.terminal.showTerminalProgress,
 		}),
 	),
+	animations: Type.Optional(
+		Type.Boolean({
+			description:
+				"Animate spinners and progress indicators. Off also freezes them under TERM=dumb or without a TTY.",
+			default: SETTINGS_DEFAULTS.terminal.animations,
+		}),
+	),
+	symbols: Type.Optional(
+		Type.Union([Type.Literal("unicode"), Type.Literal("ascii")], {
+			description: "Glyph set for spinners, markers, and rules. ascii suits terminals without Unicode fonts.",
+			default: SETTINGS_DEFAULTS.terminal.symbols,
+		}),
+	),
 	hyperlinks: Type.Optional(Type.Union([Type.Boolean(), Type.Literal("auto")])),
 	images: Type.Optional(
 		Type.Union([Type.Literal("kitty"), Type.Literal("iterm2"), Type.Literal("auto"), Type.Literal(false)]),
@@ -456,6 +469,25 @@ export const SettingsSchema = Type.Object(
 				default: SETTINGS_DEFAULTS.cacheWarming,
 			}),
 		),
+		notifications: Type.Optional(
+			Type.Object(
+				{
+					mode: Type.Optional(
+						Type.Union([Type.Literal("off"), Type.Literal("auto"), Type.Literal("bell")], {
+							description: "Desktop attention signals. auto = OSC 9 with BEL fallback; bell = BEL only.",
+							default: SETTINGS_DEFAULTS.notifications.mode,
+						}),
+					),
+					notifyWhenFocused: Type.Optional(
+						Type.Boolean({
+							description: "Notify even while the terminal is focused. Default only notifies when unfocused.",
+							default: SETTINGS_DEFAULTS.notifications.notifyWhenFocused,
+						}),
+					),
+				},
+				{ additionalProperties: false },
+			),
+		),
 		websocketConnectTimeoutMs: Type.Optional(
 			timeoutSetting({
 				description: 'WebSocket connect or open handshake timeout in milliseconds; 0 or "disabled" disables it.',
@@ -488,6 +520,13 @@ export const SettingsSchema = Type.Object(
 			Type.Union([Type.Number(), Type.Literal("auto")], {
 				description: "Lines scrolled per wheel event in fullscreen mode; numeric values are clamped from 1 to 100.",
 				default: SETTINGS_DEFAULTS.fullscreenWheelScrollLines,
+			}),
+		),
+		fullscreenMouse: Type.Optional(
+			Type.Boolean({
+				description:
+					"Capture the mouse in fullscreen mode for app-owned scroll and selection. Off keeps terminal-native copy/paste. No effect in regular TUI mode.",
+				default: SETTINGS_DEFAULTS.fullscreenMouse,
 			}),
 		),
 		queueMode: Type.Optional(

@@ -922,6 +922,15 @@ export class SettingsManager {
 		this.save();
 	}
 
+	getNotificationMode(): "off" | "auto" | "bell" {
+		const mode = this.settings.notifications?.mode;
+		return mode === "auto" || mode === "bell" ? mode : SETTINGS_DEFAULTS.notifications.mode;
+	}
+
+	getNotifyWhenFocused(): boolean {
+		return this.settings.notifications?.notifyWhenFocused ?? SETTINGS_DEFAULTS.notifications.notifyWhenFocused;
+	}
+
 	getProviderRetrySettings(): { timeoutMs?: number; maxRetries?: number; maxRetryDelayMs: number } {
 		return {
 			timeoutMs: this.settings.retry?.provider?.timeoutMs,
@@ -1238,8 +1247,35 @@ export class SettingsManager {
 		this.save();
 	}
 
+	getAnimationsEnabled(): boolean {
+		return this.settings.terminal?.animations ?? SETTINGS_DEFAULTS.terminal.animations;
+	}
+
+	setAnimationsEnabled(enabled: boolean): void {
+		if (!this.globalSettings.terminal) {
+			this.globalSettings.terminal = {};
+		}
+		this.globalSettings.terminal.animations = enabled;
+		this.markModified("terminal", "animations");
+		this.save();
+	}
+
+	getSymbolPreset(): "unicode" | "ascii" {
+		const preset = this.settings.terminal?.symbols;
+		return preset === "ascii" ? "ascii" : SETTINGS_DEFAULTS.terminal.symbols;
+	}
+
+	setSymbolPreset(preset: "unicode" | "ascii"): void {
+		if (!this.globalSettings.terminal) {
+			this.globalSettings.terminal = {};
+		}
+		this.globalSettings.terminal.symbols = preset;
+		this.markModified("terminal", "symbols");
+		this.save();
+	}
+
 	getTuiMode(): TuiMode {
-		return this.settings.tuiMode === "regular" ? "regular" : SETTINGS_DEFAULTS.tuiMode;
+		return this.settings.tuiMode === "fullscreen" ? "fullscreen" : SETTINGS_DEFAULTS.tuiMode;
 	}
 
 	setTuiMode(mode: TuiMode): void {
@@ -1292,6 +1328,16 @@ export class SettingsManager {
 		this.globalSettings.fullscreenWheelScrollLines =
 			lines === "auto" ? lines : Math.max(1, Math.min(100, Math.floor(lines)));
 		this.markModified("fullscreenWheelScrollLines");
+		this.save();
+	}
+
+	getFullscreenMouse(): boolean {
+		return this.settings.fullscreenMouse ?? SETTINGS_DEFAULTS.fullscreenMouse;
+	}
+
+	setFullscreenMouse(enabled: boolean): void {
+		this.globalSettings.fullscreenMouse = enabled;
+		this.markModified("fullscreenMouse");
 		this.save();
 	}
 

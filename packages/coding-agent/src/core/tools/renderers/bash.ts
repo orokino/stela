@@ -12,10 +12,11 @@ import { VisualLinePreview } from "../../../modes/interactive/components/visual-
 import { theme } from "../../../modes/interactive/theme/theme.ts";
 import type { ToolDefinition, ToolRenderResultOptions } from "../../extensions/types.ts";
 import type { BashToolDetails } from "../bash.ts";
-import { getTextOutput, invalidArgText, str } from "../render-utils.ts";
+import { formatToolHead, getTextOutput, invalidArgText, str, toolHeadStatus } from "../render-utils.ts";
 import { DEFAULT_MAX_BYTES, formatSize } from "../truncate.ts";
+import { TRUNCATION_TABLE } from "../truncation-table.ts";
 
-const BASH_PREVIEW_LINES = 5;
+const BASH_PREVIEW_LINES = TRUNCATION_TABLE.outputCollapsed;
 export const BASH_UPDATE_THROTTLE_MS = 100;
 function formatDuration(ms: number): string {
 	const seconds = ms / 1000;
@@ -28,12 +29,24 @@ function formatDuration(ms: number): string {
 
 	return `${Math.floor(minutes / 60)}h ${minutes % 60}m ${remainder}s`;
 }
-function formatShellCall(args: { command?: string; timeout?: number } | undefined, prompt: string): string {
+function formatShellCall(
+	args: { command?: string; timeout?: number } | undefined,
+	prompt: string,
+	theme: Parameters<typeof formatToolHead>[0]["theme"],
+	status: "running" | "ok" | "error",
+	meta?: string,
+): string {
 	const command = str(args?.command);
 	const timeout = args?.timeout as number | undefined;
-	const timeoutSuffix = timeout ? theme.fg("muted", ` (timeout ${timeout}s)`) : "";
+	const timeoutSuffix = timeout ? ` (timeout ${timeout}s)` : "";
 	const commandDisplay = command === null ? invalidArgText(theme) : command ? command : theme.fg("toolOutput", "...");
-	return theme.fg("toolTitle", theme.bold(`${prompt} ${commandDisplay}`)) + timeoutSuffix;
+	return formatToolHead({
+		theme,
+		status,
+		verb: prompt,
+		primaryArg: `${commandDisplay}${timeoutSuffix}`,
+		meta,
+	});
 }
 function rebuildBashResultRenderComponent(
 	component: Container,
@@ -45,7 +58,6 @@ function rebuildBashResultRenderComponent(
 	showImages: boolean,
 	startedAt: number | undefined,
 	endedAt: number | undefined,
-	durationMs: number | undefined,
 ): void {
 	component.clear();
 
@@ -99,28 +111,46 @@ function rebuildBashResultRenderComponent(
 		component.addChild(new Text(`\n${theme.fg("warning", `[${warnings.join(". ")}]`)}`, 0, 0));
 	}
 
-	// A final result's recorded duration wins: it is monotonic and survives reloads. The renderer's own clock is the
-	// fallback for live progress and for results stored without one.
-	if (!options.isPartial && durationMs !== undefined) {
-		component.addChild(new Text(`\n${theme.fg("muted", `Took ${formatDuration(durationMs)}`)}`, 0, 0));
-	} else if (startedAt !== undefined) {
-		const label = options.isPartial ? "Elapsed" : "Took";
-		const endTime = endedAt ?? Date.now();
-		component.addChild(new Text(`\n${theme.fg("muted", `${label} ${formatDuration(endTime - startedAt)}`)}`, 0, 0));
+	// Duration lives in the head meta; the body keeps only a live elapsed line while the command runs.
+	if (options.isPartial && startedAt !== undefined) {
+		component.addChild(
+			new Text(`\n${theme.fg("muted", `Elapsed ${formatDuration((endedAt ?? Date.now()) - startedAt)}`)}`, 0, 0),
+		);
 	}
 }
 
 /** Shell renderers are shared by bash and powershell, which differ only in the prompt they display. */
 export function createShellRenderers(prompt: string): Pick<ToolDefinition<any, any>, "renderCall" | "renderResult"> {
 	return {
-		renderCall(args, _theme, context) {
+		renderCall(args, callTheme, context) {
 			const state = context.state;
 			if (context.executionStarted && state.startedAt === undefined) {
 				state.startedAt = Date.now();
 				state.endedAt = undefined;
 			}
+			if (!context.isPartial || context.isError) {
+				state.endedAt ??= Date.now();
+			}
 			const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
-			text.setText(formatShellCall(args as { command?: string; timeout?: number } | undefined, prompt));
+			const status = toolHeadStatus(context);
+			const details = context.resultDetails as BashToolDetails | undefined;
+			const metaParts: string[] = [];
+			if (details?.exitCode !== undefined && details.exitCode !== 0) metaParts.push(`exit ${details.exitCode}`);
+			const durationMs =
+				context.durationMs ??
+				(state.startedAt !== undefined && state.endedAt !== undefined
+					? state.endedAt - state.startedAt
+					: undefined);
+			if (durationMs !== undefined && status !== "running") metaParts.push(formatDuration(durationMs));
+			text.setText(
+				formatShellCall(
+					args as { command?: string; timeout?: number } | undefined,
+					prompt,
+					callTheme,
+					status,
+					metaParts.length > 0 ? metaParts.join(" · ") : undefined,
+				),
+			);
 			return text;
 		},
 		renderResult(result, options, _theme, context) {
@@ -143,7 +173,6 @@ export function createShellRenderers(prompt: string): Pick<ToolDefinition<any, a
 				context.showImages,
 				state.startedAt,
 				state.endedAt,
-				context.durationMs,
 			);
 			component.invalidate();
 			return component;

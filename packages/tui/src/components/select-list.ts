@@ -1,3 +1,4 @@
+import { fuzzyFilter } from "../fuzzy.ts";
 import { getKeybindings } from "../keybindings.ts";
 import type { Component, TuiMouseEvent, TuiMouseEventResult } from "../tui.ts";
 import { truncateToWidth, visibleWidth } from "../utils.ts";
@@ -5,6 +6,57 @@ import { truncateToWidth, visibleWidth } from "../utils.ts";
 const DEFAULT_PRIMARY_COLUMN_WIDTH = 32;
 const PRIMARY_COLUMN_GAP = 2;
 const MIN_DESCRIPTION_WIDTH = 10;
+
+/** Shared selection grammar (U9 pick): `❯` selection marker + `✔` current-value mark (CC U9). */
+export const SELECT_MARKER = "❯";
+export const SELECT_CURRENT_MARK = "✔";
+
+/** Selection marker in the active symbol preset (`>` under ASCII). */
+export function selectMarker(): string {
+	return pickSymbol(SELECT_MARKER, ">");
+}
+
+/** Current-value mark in the active preset (`*` under ASCII). */
+export function selectCurrentMark(): string {
+	return pickSymbol(SELECT_CURRENT_MARK, "*");
+}
+
+/** Height clamp: half the screen, min 6, max rows−3 (CC U9). */
+export function selectListHeight(rows: number): number {
+	return Math.max(1, Math.min(Math.max(6, Math.floor(rows / 2)), rows - 3));
+}
+
+/** Overflow affordance: `↑ N more` / `↓ N more` joined by ` · ` (CC U9); empty when all fits. */
+export function selectListOverflow(startIndex: number, endIndex: number, total: number): string {
+	const up = pickSymbol("↑", "^");
+	const down = pickSymbol("↓", "v");
+	const joiner = pickSymbol(" · ", " / ");
+	const overflows: string[] = [];
+	if (startIndex > 0) overflows.push(`${up} ${startIndex} more`);
+	if (endIndex < total) overflows.push(`${down} ${total - endIndex} more`);
+	return overflows.length > 0 ? `  ${overflows.join(joiner)}` : "";
+}
+
+/** Search prompt shown in every searchable picker (CX U9, OMP U9). */
+export const SELECT_SEARCH_PLACEHOLDER = "Type to search";
+
+/** Symbol preset for terminals that cannot render Unicode glyphs (DV `unicode_mode`, OMP preset). */
+export type SymbolPreset = "unicode" | "ascii";
+
+let activeSymbolPreset: SymbolPreset = "unicode";
+
+export function setSymbolPreset(preset: SymbolPreset): void {
+	activeSymbolPreset = preset;
+}
+
+export function getSymbolPreset(): SymbolPreset {
+	return activeSymbolPreset;
+}
+
+/** Resolve a glyph pair to the active preset. */
+export function pickSymbol(unicode: string, ascii: string): string {
+	return activeSymbolPreset === "ascii" ? ascii : unicode;
+}
 
 const normalizeToSingleLine = (text: string): string => text.replace(/[\r\n]+/g, " ").trim();
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(value, max));
@@ -59,7 +111,8 @@ export class SelectList implements Component {
 	}
 
 	setFilter(filter: string): void {
-		this.filteredItems = this.items.filter((item) => item.value.toLowerCase().startsWith(filter.toLowerCase()));
+		this.filteredItems =
+			filter === "" ? this.items : fuzzyFilter(this.items, filter, (item) => `${item.label} ${item.value}`);
 		// Reset selection when filter changes
 		this.selectedIndex = 0;
 	}
@@ -77,7 +130,7 @@ export class SelectList implements Component {
 
 		// If no items match filter, show message
 		if (this.filteredItems.length === 0) {
-			lines.push(this.theme.noMatch("  No matching commands"));
+			lines.push(this.theme.noMatch(this.items.length === 0 ? "  No items" : "  No matching items"));
 			return lines;
 		}
 
@@ -96,11 +149,10 @@ export class SelectList implements Component {
 			lines.push(this.renderItem(item, isSelected, width, descriptionSingleLine, primaryColumnWidth));
 		}
 
-		// Add scroll indicators if needed
-		if (startIndex > 0 || endIndex < this.filteredItems.length) {
-			const scrollText = `  (${this.selectedIndex + 1}/${this.filteredItems.length})`;
-			// Truncate if too long for terminal
-			lines.push(this.theme.scrollInfo(truncateToWidth(scrollText, width - 2, "")));
+		// Overflow affordance: `↑ N more` / `↓ N more` joined by ` · ` (CC U9).
+		const overflow = selectListOverflow(startIndex, endIndex, this.filteredItems.length);
+		if (overflow) {
+			lines.push(this.theme.scrollInfo(truncateToWidth(overflow, width - 2, "")));
 		}
 
 		return lines;
@@ -187,7 +239,7 @@ export class SelectList implements Component {
 		descriptionSingleLine: string | undefined,
 		primaryColumnWidth: number,
 	): string {
-		const prefix = isSelected ? "→ " : "  ";
+		const prefix = isSelected ? `${selectMarker()} ` : "  ";
 		const prefixWidth = visibleWidth(prefix);
 
 		if (descriptionSingleLine && width > 40) {
@@ -197,7 +249,8 @@ export class SelectList implements Component {
 			const truncatedValueWidth = visibleWidth(truncatedValue);
 			const spacing = " ".repeat(Math.max(1, effectivePrimaryColumnWidth - truncatedValueWidth));
 			const descriptionStart = prefixWidth + truncatedValueWidth + spacing.length;
-			const remainingWidth = width - descriptionStart - 2; // -2 for safety
+			// Description column ≤40% of the width (CC U9).
+			const remainingWidth = Math.min(width - descriptionStart - 2, Math.floor(width * 0.4));
 
 			if (remainingWidth > MIN_DESCRIPTION_WIDTH) {
 				const truncatedDesc = truncateToWidth(descriptionSingleLine, remainingWidth, "");

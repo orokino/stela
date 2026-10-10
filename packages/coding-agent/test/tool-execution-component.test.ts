@@ -259,7 +259,7 @@ describe("ToolExecutionComponent parity", () => {
 		component.invalidate();
 		expect(stripAnsi(component.render(120).join("\n"))).toBe(completed);
 		expect(running).toContain(`Elapsed ${formatted}`);
-		expect(completed).toContain(`Took ${formatted}`);
+		expect(completed).toContain(`${formatted}`);
 	});
 
 	// #10549
@@ -285,8 +285,8 @@ describe("ToolExecutionComponent parity", () => {
 			component.updateResult({ content: [], isError: false, durationMs: 4_200 }, false);
 			return stripAnsi(component.render(120).join("\n"));
 		};
-		expect(render(true)).toContain("Took 4.2s");
-		expect(render(false)).toContain("Took 4.2s");
+		expect(render(true)).toContain("4.2s");
+		expect(render(false)).toContain("4.2s");
 	});
 
 	test("does not duplicate built-in headers when passed the active built-in definition", () => {
@@ -636,7 +636,7 @@ describe("ToolExecutionComponent parity", () => {
 			title: "SKILL.md",
 			path: join(process.cwd(), "attio", "SKILL.md"),
 			content: "---\nname: attio\ndescription: CRM helper\n---\n\n# Hidden skill instructions",
-			compact: "[skill] attio",
+			compact: "skill attio",
 			hidden: "Hidden skill instructions",
 			absent: "read skill attio",
 		},
@@ -702,7 +702,7 @@ describe("ToolExecutionComponent parity", () => {
 	}
 
 	for (const scenario of [
-		{ title: "SKILL.md", path: join(process.cwd(), "attio", "SKILL.md"), compact: "[skill] attio:120-329" },
+		{ title: "SKILL.md", path: join(process.cwd(), "attio", "SKILL.md"), compact: "skill attio:120-329" },
 		{ title: "Pi documentation", path: getReadmePath(), compact: "read docs README.md:120-329" },
 	] as const) {
 		test(`shows the read line range in compact ${scenario.title} reads before the expand hint`, () => {

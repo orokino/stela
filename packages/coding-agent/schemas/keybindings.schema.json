@@ -23,6 +23,10 @@
       "$ref": "#/$defs/KeybindingValue",
       "description": "Select next prompt history entry"
     },
+    "tui.editor.historySearch": {
+      "$ref": "#/$defs/KeybindingValue",
+      "description": "Search prompt history"
+    },
     "tui.editor.cursorLeft": {
       "$ref": "#/$defs/KeybindingValue",
       "description": "Move cursor left"

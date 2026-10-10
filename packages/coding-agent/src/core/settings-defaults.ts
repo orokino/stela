@@ -36,6 +36,8 @@ export const SETTINGS_DEFAULTS = {
 		imageWidthCells: 60,
 		clearOnShrink: false,
 		showTerminalProgress: false,
+		animations: true,
+		symbols: "unicode",
 	},
 	images: {
 		autoResize: true,
@@ -45,7 +47,7 @@ export const SETTINGS_DEFAULTS = {
 	treeFilterMode: "default",
 	editorPaddingX: 0,
 	outputPad: 1,
-	autocompleteMaxVisible: 5,
+	autocompleteMaxVisible: 8,
 	markdown: {
 		codeBlockIndent: "  ",
 		mermaid: "streaming",
@@ -64,9 +66,14 @@ export const SETTINGS_DEFAULTS = {
 		inlineBudget: 3000,
 	},
 	cacheWarming: "streaming",
-	tuiMode: "fullscreen",
+	tuiMode: "regular",
 	fullscreenExitOutput: "transcript",
 	fullscreenScrollbar: "auto",
 	fullscreenCopyOnSelect: true,
 	fullscreenWheelScrollLines: "auto",
+	fullscreenMouse: false,
+	notifications: {
+		mode: "off",
+		notifyWhenFocused: false,
+	},
 } as const;

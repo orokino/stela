@@ -49,7 +49,16 @@ export {
 	setImageTranscoder,
 } from "./components/image.ts";
 export { Input } from "./components/input.ts";
-export { Loader, type LoaderIndicatorOptions } from "./components/loader.ts";
+export {
+	animationsAllowed,
+	Loader,
+	type LoaderIndicatorOptions,
+	SPINNER_FRAMES,
+	SPINNER_INTERVAL_MS,
+	SPINNER_PRESETS,
+	type SpinnerPreset,
+	spinnerFrames,
+} from "./components/loader.ts";
 export { type DefaultTextStyle, Markdown, type MarkdownOptions, type MarkdownTheme } from "./components/markdown.ts";
 export { MouseRegion, type MouseRegionHandler } from "./components/mouse-region.ts";
 export {
@@ -59,11 +68,22 @@ export {
 	type ScrollViewScrollToOptions,
 } from "./components/scroll-view.ts";
 export {
+	getSymbolPreset,
+	pickSymbol,
+	SELECT_CURRENT_MARK,
+	SELECT_MARKER,
+	SELECT_SEARCH_PLACEHOLDER,
 	type SelectItem,
 	SelectList,
 	type SelectListLayoutOptions,
 	type SelectListTheme,
 	type SelectListTruncatePrimaryContext,
+	type SymbolPreset,
+	selectCurrentMark,
+	selectListHeight,
+	selectListOverflow,
+	selectMarker,
+	setSymbolPreset,
 } from "./components/select-list.ts";
 export { type SettingItem, SettingsList, type SettingsListTheme } from "./components/settings-list.ts";
 export { Spacer } from "./components/spacer.ts";
@@ -116,7 +136,7 @@ export { formatProgramStatus, type ProgramStatus } from "./program-status.ts";
 // Input buffering for batch splitting
 export { StdinBuffer, type StdinBufferEventMap, type StdinBufferOptions } from "./stdin-buffer.ts";
 // Terminal interface and implementations
-export { isAppleTerminalSession, ProcessTerminal, type Terminal } from "./terminal.ts";
+export { isAppleTerminalSession, notificationSequence, ProcessTerminal, type Terminal } from "./terminal.ts";
 // Terminal colors
 export {
 	parseTerminalColorSchemeReport,
@@ -147,6 +167,7 @@ export {
 	type ImageProtocol,
 	type ImageRenderOptions,
 	imageFallback,
+	mergeCapabilityOverrides,
 	renderImage,
 	resetCapabilitiesCache,
 	setCapabilities,
@@ -160,7 +181,8 @@ export {
 	CURSOR_MARKER,
 	compositeTuiLine,
 	type Focusable,
-	isFocusable,
+	FRAME_BUDGET_MS,
+	FRAME_BYTES_CAP,
 	isViewportTUI,
 	type OverlayAnchor,
 	type OverlayBounds,

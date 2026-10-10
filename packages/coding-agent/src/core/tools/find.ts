@@ -43,6 +43,7 @@ const DEFAULT_LIMIT = 1000;
 export interface FindToolDetails {
 	truncation?: TruncationResult;
 	resultLimitReached?: number;
+	resultCount?: number;
 }
 
 /**
@@ -146,7 +147,7 @@ export function createFindToolDefinition(
 							const rawOutput = relativized.join("\n");
 							const truncation = truncateHead(rawOutput, { maxLines: Number.MAX_SAFE_INTEGER });
 							let resultOutput = truncation.content;
-							const details: FindToolDetails = {};
+							const details: FindToolDetails = { resultCount: relativized.length };
 							const notices: string[] = [];
 							if (resultLimitReached) {
 								notices.push(`${effectiveLimit} results limit reached`);
@@ -276,7 +277,7 @@ export function createFindToolDefinition(
 							const rawOutput = relativized.join("\n");
 							const truncation = truncateHead(rawOutput, { maxLines: Number.MAX_SAFE_INTEGER });
 							let resultOutput = truncation.content;
-							const details: FindToolDetails = {};
+							const details: FindToolDetails = { resultCount: relativized.length };
 							const notices: string[] = [];
 							if (resultLimitReached) {
 								notices.push(

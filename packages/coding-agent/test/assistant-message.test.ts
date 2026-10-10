@@ -1,6 +1,6 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { TuiMouseEvent } from "@earendil-works/pi-tui";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { AssistantMessageComponent } from "../src/modes/interactive/components/assistant-message.ts";
 import { UserMessageComponent } from "../src/modes/interactive/components/user-message.ts";
 import { initTheme } from "../src/modes/interactive/theme/theme.ts";
@@ -12,7 +12,7 @@ const OSC133_ZONE_FINAL = "\x1b]133;C\x07";
 
 function createAssistantMessage(
 	content: AssistantMessage["content"],
-	overrides: Partial<Pick<AssistantMessage, "stopReason">> = {},
+	overrides: Partial<Pick<AssistantMessage, "stopReason" | "durationMs">> = {},
 ): AssistantMessage {
 	return {
 		role: "assistant",
@@ -30,6 +30,7 @@ function createAssistantMessage(
 		},
 		stopReason: overrides.stopReason ?? "stop",
 		timestamp: Date.now(),
+		...(overrides.durationMs === undefined ? {} : { durationMs: overrides.durationMs }),
 	};
 }
 
@@ -70,7 +71,7 @@ describe("AssistantMessageComponent", () => {
 		);
 		const rendered = component.render(80).join("\n");
 
-		expect(rendered).toContain("Thinking...");
+		expect(rendered).toContain("+ Thought");
 		expect(rendered).toContain("Response was truncated before completion.");
 	});
 
@@ -78,18 +79,47 @@ describe("AssistantMessageComponent", () => {
 		initTheme("dark");
 
 		const component = new AssistantMessageComponent(
-			createAssistantMessage([
-				{ type: "thinking", thinking: "first thought" },
-				{ type: "thinking", thinking: "" },
-				{ type: "thinking", thinking: "second thought" },
-				{ type: "text", text: "answer" },
-			]),
+			createAssistantMessage(
+				[
+					{ type: "thinking", thinking: "first thought" },
+					{ type: "thinking", thinking: "" },
+					{ type: "thinking", thinking: "second thought" },
+					{ type: "text", text: "answer" },
+				],
+				{ durationMs: 3200 },
+			),
 			true,
 		);
 		const rendered = stripAnsi(component.render(80).join("\n"));
 
-		expect(rendered.match(/Thinking\.\.\./g)).toHaveLength(1);
+		expect(rendered.match(/\+ Thought · 3s/g)).toHaveLength(1);
 		expect(rendered).toContain("answer");
+	});
+
+	test("shows the live thinking row from thinking_start, before any delta text", () => {
+		initTheme("dark");
+		const component = new AssistantMessageComponent(undefined, true);
+		component.setThinkingStartedAt(performance.now());
+		component.updateContent(createAssistantMessage([{ type: "thinking", thinking: "" }]), true);
+		const rendered = stripAnsi(component.render(80).join("\n"));
+		expect(rendered).toContain("Thinking… 0s");
+		component.updateContent(createAssistantMessage([{ type: "thinking", thinking: "" }]), false);
+	});
+
+	test("ticks the live thinking row without new deltas", () => {
+		initTheme("dark");
+		vi.useFakeTimers();
+		try {
+			const component = new AssistantMessageComponent(undefined, true);
+			component.setThinkingStartedAt(performance.now());
+			component.updateContent(createAssistantMessage([{ type: "thinking", thinking: "" }]), true);
+			vi.advanceTimersByTime(2100);
+			const rendered = stripAnsi(component.render(80).join("\n"));
+			expect(rendered).toContain("Thinking… 2s");
+			component.updateContent(createAssistantMessage([{ type: "thinking", thinking: "" }]), false);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	test("collapses individual thinking runs when clicked", () => {
@@ -123,7 +153,7 @@ describe("AssistantMessageComponent", () => {
 
 		const collapsed = stripAnsi(component.render(width).join("\n"));
 		expect(collapsed).not.toContain("first reasoning");
-		expect(collapsed).toContain("Thinking...");
+		expect(collapsed).toContain("+ Thought");
 		expect(collapsed).toContain("second reasoning");
 	});
 
@@ -137,7 +167,6 @@ describe("AssistantMessageComponent", () => {
 			]),
 			false,
 			undefined,
-			"Thinking...",
 			1,
 		);
 		const lines = component.render(80).map((line) => stripAnsi(line));
@@ -155,7 +184,7 @@ describe("AssistantMessageComponent", () => {
 		initTheme("dark");
 		const calls: string[] = [];
 		const message = createAssistantMessage([{ type: "text", text: "The result is $x^2$." }]);
-		const component = new AssistantMessageComponent(message, false, undefined, "Thinking...", 1, [
+		const component = new AssistantMessageComponent(message, false, undefined, 1, [
 			(markdown, context) => {
 				calls.push("formula");
 				expect(context).toEqual({ messageType: "assistant", isStreaming: false, availableWidth: 78 });
@@ -175,7 +204,7 @@ describe("AssistantMessageComponent", () => {
 		initTheme("dark");
 		const streamingStates: boolean[] = [];
 		const message = createAssistantMessage([{ type: "text", text: "partial" }]);
-		const component = new AssistantMessageComponent(undefined, false, undefined, "Thinking...", 1, [
+		const component = new AssistantMessageComponent(undefined, false, undefined, 1, [
 			(markdown, context) => {
 				streamingStates.push(context.isStreaming);
 				return context.isStreaming ? markdown : `${markdown} transformed`;
@@ -197,7 +226,6 @@ describe("AssistantMessageComponent", () => {
 			createAssistantMessage([{ type: "text", text: "answer" }]),
 			false,
 			undefined,
-			"Thinking...",
 			1,
 			[
 				(markdown, context) => {
@@ -220,7 +248,6 @@ describe("AssistantMessageComponent", () => {
 			createAssistantMessage([{ type: "text", text: "still visible" }]),
 			false,
 			undefined,
-			"Thinking...",
 			1,
 			[
 				(markdown) => {
@@ -248,7 +275,7 @@ describe("AssistantMessageComponent", () => {
 			{ type: "text", text: "answer" },
 			{ type: "thinking", thinking: "reasoning" },
 		]);
-		const component = new AssistantMessageComponent(message, false, undefined, "Thinking...", 1, [
+		const component = new AssistantMessageComponent(message, false, undefined, 1, [
 			(markdown, { messageType }) => {
 				return `${messageType}:${markdown}`;
 			},

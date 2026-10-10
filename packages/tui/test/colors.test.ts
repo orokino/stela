@@ -1,9 +1,11 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
 import {
+	backgroundAnsi,
 	colorToHex,
 	colorToOkhsl,
 	colorToRgb,
+	foregroundAnsi,
 	indexedColor,
 	okhslColor,
 	oklchColor,
@@ -43,5 +45,38 @@ describe("colors", () => {
 			"\x1b[38;2;18;52;86m\x1b[48;5;9m\x1b[1m\x1b[3mReady\x1b[23m\x1b[22m\x1b[49m\x1b[39m",
 		);
 		assert.match(styleText("Ready", { fg: rgbColor(18, 52, 86) }, "256color"), /^\x1b\[38;5;\d+mReady\x1b\[39m$/);
+	});
+
+	it("maps the frozen palette to the basic ANSI colours by hue and brightness", () => {
+		// accent #6E76FF is blue-dominant and bright, not grey (nearest-RGB would pick silver).
+		assert.strictEqual(foregroundAnsi(rgbColor(0x6e, 0x76, 0xff), "16color"), "\x1b[94m");
+		assert.strictEqual(backgroundAnsi(rgbColor(0x6e, 0x76, 0xff), "16color"), "\x1b[104m");
+		// success #3FB950, warning #D29922, error #F85149.
+		assert.strictEqual(foregroundAnsi(rgbColor(0x3f, 0xb9, 0x50), "16color"), "\x1b[92m");
+		assert.strictEqual(foregroundAnsi(rgbColor(0xd2, 0x99, 0x22), "16color"), "\x1b[93m");
+		assert.strictEqual(foregroundAnsi(rgbColor(0xf8, 0x51, 0x49), "16color"), "\x1b[91m");
+		// Near-greys go to bright black, silver and bright white by luminance.
+		assert.strictEqual(foregroundAnsi(rgbColor(0x9a, 0x9a, 0xa2), "16color"), "\x1b[90m");
+		assert.strictEqual(foregroundAnsi(rgbColor(0x6a, 0x6a, 0x73), "16color"), "\x1b[90m");
+		assert.strictEqual(foregroundAnsi(rgbColor(0xe8, 0xe8, 0xea), "16color"), "\x1b[97m");
+		assert.strictEqual(foregroundAnsi(rgbColor(0x0b, 0x0b, 0x0c), "16color"), "\x1b[30m");
+		// A non-bright saturated colour stays in the normal half.
+		assert.strictEqual(foregroundAnsi(rgbColor(0x80, 0x20, 0x20), "16color"), "\x1b[31m");
+		// Indexed colours are mapped too, not passed through.
+		assert.strictEqual(foregroundAnsi(indexedColor(196), "16color"), "\x1b[91m");
+	});
+
+	it("drops colour at nocolor but keeps weight and reverse video", () => {
+		assert.strictEqual(foregroundAnsi(rgbColor(255, 0, 0), "nocolor"), "");
+		assert.strictEqual(backgroundAnsi(rgbColor(255, 0, 0), "nocolor"), "");
+		assert.strictEqual(foregroundAnsi(indexedColor(9), "nocolor"), "");
+		assert.strictEqual(
+			styleText("Ready", { fg: rgbColor(255, 0, 0), bold: true }, "nocolor"),
+			"\x1b[1mReady\x1b[22m",
+		);
+		assert.strictEqual(
+			styleText("Ready", { bg: rgbColor(255, 0, 0), inverse: true, underline: true }, "nocolor"),
+			"\x1b[4m\x1b[7mReady\x1b[27m\x1b[24m",
+		);
 	});
 });

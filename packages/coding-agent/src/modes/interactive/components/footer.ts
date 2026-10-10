@@ -1,5 +1,5 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import { type Component, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { type Component, pickSymbol, spinnerFrames, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { AgentSession } from "../../../core/agent-session.ts";
 import { areExperimentalFeaturesEnabled } from "../../../core/experimental.ts";
 import type { ContextUsage } from "../../../core/extensions/types.ts";
@@ -7,6 +7,7 @@ import type { ReadonlyFooterDataProvider } from "../../../core/footer-data-provi
 import { PERMISSION_MODE_LABELS, type PermissionMode } from "../../../core/permissions/modes.ts";
 import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../../../core/usage-totals.ts";
 import { theme } from "../theme/theme.ts";
+import { keyText } from "./keybinding-hints.ts";
 
 /**
  * Sanitize text for display in a single-line status.
@@ -29,6 +30,18 @@ export function formatTokens(count: number): string {
 	if (count < 1000000) return `${Math.round(count / 1000)}k`;
 	if (count < 10000000) return `${(count / 1000000).toFixed(1)}M`;
 	return `${Math.round(count / 1000000)}M`;
+}
+
+/**
+ * Context-window state for the footer's context segment. Thresholds match the existing colour
+ * bands (70/90%); the level drives glyph + word + colour so the warning reads without colour.
+ */
+export type ContextLevel = "ok" | "high" | "critical";
+
+export function contextLevelForPercent(percent: number): ContextLevel {
+	if (percent > 90) return "critical";
+	if (percent > 70) return "high";
+	return "ok";
 }
 
 export function formatCwdForFooter(cwd: string, home: string | undefined): string {
@@ -198,16 +211,21 @@ export class FooterComponent implements Component {
 			statsParts.push(costStr);
 		}
 
-		// Colorize context percentage based on usage
-		let contextPercentStr: string;
-		const autoIndicator = this.autoCompactEnabled ? " (auto)" : "";
+		// Context segment: OMP's `◫ pct/window` glyph form (OMP U8). Above the bands the level adds
+		// a word (`high`, `critical`) so the warning reads without colour; the auto-compact marker
+		// keeps its `⟲` glyph.
+		const autoIndicator = this.autoCompactEnabled ? ` ${pickSymbol("⟲", "(auto)")}` : "";
+		const contextLevel = contextPercent === "?" ? "ok" : contextLevelForPercent(contextPercentValue);
+		const contextWord = contextLevel === "ok" ? "" : contextLevel === "high" ? " high" : " critical";
+		const contextMark = pickSymbol("◫", "ctx");
 		const contextPercentDisplay =
 			contextPercent === "?"
-				? `?/${formatTokens(contextWindow)}${autoIndicator}`
-				: `${contextPercent}%/${formatTokens(contextWindow)}${autoIndicator}`;
-		if (contextPercentValue > 90) {
+				? `${contextMark} ?/${formatTokens(contextWindow)}${autoIndicator}`
+				: `${contextMark} ${contextPercent}%/${formatTokens(contextWindow)}${contextWord}${autoIndicator}`;
+		let contextPercentStr: string;
+		if (contextLevel === "critical") {
 			contextPercentStr = theme.fg("error", contextPercentDisplay);
-		} else if (contextPercentValue > 70) {
+		} else if (contextLevel === "high") {
 			contextPercentStr = theme.fg("warning", contextPercentDisplay);
 		} else {
 			contextPercentStr = contextPercentDisplay;
@@ -217,6 +235,9 @@ export class FooterComponent implements Component {
 			statsParts.push(`${theme.fg("dim", "•")} ${theme.bold(theme.fg("warning", "xp"))}`);
 		}
 
+		// Drop order at narrow widths (CX U8: hints first, then model, then path):
+		// shorten hints → drop hints → drop model → shorten path → drop path.
+		// The context segment and permission mode always stay: they carry live state.
 		let statsLeft = statsParts.join(" ");
 
 		// Add model name on the right side, plus thinking level if model supports it
@@ -233,18 +254,24 @@ export class FooterComponent implements Component {
 		// Calculate available space for padding (minimum 2 spaces between stats and model)
 		const minPadding = 2;
 
-		// Add thinking level indicator if model supports reasoning
-		let rightSideWithoutProvider = modelName;
-		if (state.model?.reasoning) {
-			const thinkingLevel = state.thinkingLevel || "off";
-			rightSideWithoutProvider =
-				thinkingLevel === "off" ? `${modelName} • thinking off` : `${modelName} • ${thinkingLevel}`;
-		}
-		// A virtual model routes each request; show where the latest response went.
-		const routed = this.session.routedModel;
-		if (routed) {
-			const level = routed.thinkingLevel ? ` • ${routed.thinkingLevel}` : "";
-			rightSideWithoutProvider += ` → ${routed.model.id}${level}`;
+		// Right side: while streaming, OC's running slot (spinner + interrupt hint, OC U8) replaces
+		// the model label; otherwise the model + thinking level + routing shows as before.
+		let rightSideWithoutProvider: string;
+		if (this.session.isStreaming) {
+			rightSideWithoutProvider = `${spinnerFrames()[0]} Working (${keyText("app.interrupt")} to interrupt)`;
+		} else {
+			rightSideWithoutProvider = modelName;
+			if (state.model?.reasoning) {
+				const thinkingLevel = state.thinkingLevel || "off";
+				rightSideWithoutProvider =
+					thinkingLevel === "off" ? `${modelName} • thinking off` : `${modelName} • ${thinkingLevel}`;
+			}
+			// A virtual model routes each request; show where the latest response went.
+			const routed = this.session.routedModel;
+			if (routed) {
+				const level = routed.thinkingLevel ? ` • ${routed.thinkingLevel}` : "";
+				rightSideWithoutProvider += ` → ${routed.model.id}${level}`;
+			}
 		}
 
 		// Prepend the provider in parentheses if there are multiple providers and there's enough room

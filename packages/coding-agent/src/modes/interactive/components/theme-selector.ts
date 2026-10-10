@@ -1,4 +1,10 @@
-import { Container, type SelectItem, SelectList, type SelectListLayoutOptions } from "@earendil-works/pi-tui";
+import {
+	Container,
+	SELECT_CURRENT_MARK,
+	type SelectItem,
+	SelectList,
+	type SelectListLayoutOptions,
+} from "@earendil-works/pi-tui";
 import { getAvailableThemes, getSelectListTheme } from "../theme/theme.ts";
 import { DynamicBorder } from "./dynamic-border.ts";
 
@@ -28,7 +34,7 @@ export class ThemeSelectorComponent extends Container {
 		const themeItems: SelectItem[] = themes.map((name) => ({
 			value: name,
 			label: name,
-			description: name === currentTheme ? "(current)" : undefined,
+			description: name === currentTheme ? `${SELECT_CURRENT_MARK} current` : undefined,
 		}));
 
 		// Add top border

@@ -251,6 +251,14 @@
           "$ref": "#/$defs/ColorValue",
           "description": "Context lines in tool diffs"
         },
+        "toolDiffAddedBg": {
+          "$ref": "#/$defs/ColorValue",
+          "description": "Added-line background in tool diffs, truecolor only (falls back to toolSuccessBg when omitted)"
+        },
+        "toolDiffRemovedBg": {
+          "$ref": "#/$defs/ColorValue",
+          "description": "Removed-line background in tool diffs, truecolor only (falls back to toolErrorBg when omitted)"
+        },
         "syntaxComment": {
           "$ref": "#/$defs/ColorValue",
           "description": "Syntax highlighting: comments"

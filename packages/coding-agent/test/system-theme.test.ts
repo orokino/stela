@@ -1,5 +1,5 @@
 import { colorToOklch, colorToRgb, parseColor, type RgbColor, rgbColor } from "@earendil-works/pi-tui";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	generateSystemThemeColors,
 	type SystemThemeInput,
@@ -42,6 +42,15 @@ function resolved(input: SystemThemeInput, token: ThemeToken): RgbColor {
 
 afterEach(() => {
 	setTerminalColors({});
+	vi.unstubAllEnvs();
+});
+
+// Colour rendering is under test, so the ambient terminal environment of the harness must not leak in.
+beforeEach(() => {
+	vi.stubEnv("NO_COLOR", undefined);
+	vi.stubEnv("PI_COLOR_MODE", undefined);
+	vi.stubEnv("COLORTERM", undefined);
+	vi.stubEnv("TERM", "xterm-256color");
 });
 
 describe("generateSystemThemeColors", () => {

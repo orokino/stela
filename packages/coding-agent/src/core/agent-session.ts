@@ -426,6 +426,7 @@ export class AgentSession {
 
 	// Bash execution state
 	private readonly _bashAbortControllers = new Set<AbortController>();
+	private readonly _bashRunning = new Map<AbortController, { command: string; startedAt: number }>();
 	private _pendingBashMessages: BashExecutionMessage[] = [];
 
 	// Extension system
@@ -3916,7 +3917,8 @@ export class AgentSession {
 	): Promise<BashResult> {
 		const abortController = new AbortController();
 		this._bashAbortControllers.add(abortController);
-
+		this._bashRunning.set(abortController, { command, startedAt: Date.now() });
+		this._emitQueueUpdate();
 		// Apply command prefix if configured (e.g., "shopt -s expand_aliases" for alias support)
 		const prefix = this.settingsManager.getShellCommandPrefix();
 		const shellPath = this.settingsManager.getShellPath();
@@ -3940,6 +3942,8 @@ export class AgentSession {
 			return result;
 		} finally {
 			this._bashAbortControllers.delete(abortController);
+			this._bashRunning.delete(abortController);
+			this._emitQueueUpdate();
 		}
 	}
 
@@ -3982,6 +3986,11 @@ export class AgentSession {
 	/** Whether a bash command is currently running */
 	get isBashRunning(): boolean {
 		return this._bashAbortControllers.size > 0;
+	}
+
+	/** Running `!`/`!!` shells for the task HUD, oldest first. */
+	get runningShells(): Array<{ command: string; startedAt: number }> {
+		return [...this._bashRunning.values()];
 	}
 
 	/** Whether there are pending bash messages waiting to be flushed */

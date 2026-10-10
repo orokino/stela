@@ -8,7 +8,10 @@ import {
 	type Focusable,
 	getKeybindings,
 	Input,
+	SELECT_MARKER,
+	SELECT_SEARCH_PLACEHOLDER,
 	Spacer,
+	selectListOverflow,
 	Text,
 	truncateToWidth,
 	visibleWidth,
@@ -330,7 +333,7 @@ class SessionList implements Component, Focusable {
 	) {
 		this.allSessions = sessions;
 		this.filteredSessions = [];
-		this.searchInput = new Input();
+		this.searchInput = new Input({ placeholder: SELECT_SEARCH_PLACEHOLDER });
 		this.showCwd = showCwd;
 		this.sortMode = sortMode;
 		this.nameFilter = nameFilter;
@@ -481,7 +484,7 @@ class SessionList implements Component, Focusable {
 			}
 
 			// Cursor
-			const cursor = isSelected ? theme.fg("accent", "› ") : "  ";
+			const cursor = isSelected ? theme.fg("accent", `${SELECT_MARKER} `) : "  ";
 
 			// Calculate available width for message
 			const prefixWidth = visibleWidth(prefix);
@@ -517,11 +520,10 @@ class SessionList implements Component, Focusable {
 			lines.push(truncateToWidth(line, width));
 		}
 
-		// Add scroll indicator if needed
-		if (startIndex > 0 || endIndex < this.filteredSessions.length) {
-			const scrollText = `  (${this.selectedIndex + 1}/${this.filteredSessions.length})`;
-			const scrollInfo = theme.fg("muted", truncateToWidth(scrollText, width, ""));
-			lines.push(scrollInfo);
+		// Overflow affordance: `↑ N more` / `↓ N more` joined by ` · ` (CC U9).
+		const overflow = selectListOverflow(startIndex, endIndex, this.filteredSessions.length);
+		if (overflow) {
+			lines.push(theme.fg("muted", truncateToWidth(overflow, width, "")));
 		}
 
 		return lines;

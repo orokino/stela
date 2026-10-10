@@ -25,6 +25,7 @@ import {
 	registerKittyImageMetadata,
 	renderImage,
 	resetCapabilitiesCache,
+	resolveColorMode,
 	setCapabilities,
 	setCapabilityOverrides,
 	setCellDimensions,
@@ -48,6 +49,8 @@ const ENV_KEYS = [
 	"PI_HYPERLINKS",
 	"PI_IMAGE_PROTOCOL",
 	"PI_TRUE_COLOR",
+	"PI_COLOR_MODE",
+	"NO_COLOR",
 ] as const;
 
 function withEnv<T>(overrides: Record<string, string | undefined>, fn: () => T): T {
@@ -228,13 +231,13 @@ describe("detectCapabilities", () => {
 	it("applies environment overrides", () => {
 		assert.deepStrictEqual(
 			withEnv({ PI_HYPERLINKS: "1", PI_IMAGE_PROTOCOL: "kitty", PI_TRUE_COLOR: "1" }, () => detectCapabilities()),
-			{ images: "kitty", trueColor: true, hyperlinks: true },
+			{ images: "kitty", trueColor: true, hyperlinks: true, colorMode: "truecolor" },
 		);
 		assert.deepStrictEqual(
 			withEnv({ TERM_PROGRAM: "iterm.app", PI_HYPERLINKS: "0", PI_IMAGE_PROTOCOL: "none", PI_TRUE_COLOR: "0" }, () =>
 				detectCapabilities(),
 			),
-			{ images: null, trueColor: false, hyperlinks: false },
+			{ images: null, trueColor: false, hyperlinks: false, colorMode: "256color" },
 		);
 	});
 
@@ -249,17 +252,27 @@ describe("detectCapabilities", () => {
 				},
 				() => detectCapabilities(),
 			),
-			{ images: "kitty", trueColor: true, hyperlinks: true },
+			{ images: "kitty", trueColor: true, hyperlinks: true, colorMode: "truecolor" },
 		);
 	});
 
 	it("applies and clears programmatic overrides", () => {
 		withEnv({ PI_HYPERLINKS: "1", PI_IMAGE_PROTOCOL: "kitty", PI_TRUE_COLOR: "1" }, () => {
-			setCapabilityOverrides({ images: null, trueColor: false, hyperlinks: false });
+			setCapabilityOverrides({ images: null, trueColor: false, hyperlinks: false, colorMode: "nocolor" });
 			try {
-				assert.deepStrictEqual(getCapabilities(), { images: null, trueColor: false, hyperlinks: false });
+				assert.deepStrictEqual(getCapabilities(), {
+					images: null,
+					trueColor: false,
+					hyperlinks: false,
+					colorMode: "nocolor",
+				});
 				setCapabilityOverrides({});
-				assert.deepStrictEqual(getCapabilities(), { images: "kitty", trueColor: true, hyperlinks: true });
+				assert.deepStrictEqual(getCapabilities(), {
+					images: "kitty",
+					trueColor: true,
+					hyperlinks: true,
+					colorMode: "truecolor",
+				});
 			} finally {
 				setCapabilityOverrides({});
 				resetCapabilitiesCache();
@@ -296,6 +309,45 @@ describe("detectCapabilities", () => {
 			assert.strictEqual(caps.hyperlinks, false);
 			assert.strictEqual(caps.images, null);
 		});
+	});
+
+	it("resolves colour depth from the environment, most specific signal first", () => {
+		withEnv({}, () => assert.strictEqual(resolveColorMode(), "256color"));
+		withEnv({ TERM: "xterm-256color" }, () => assert.strictEqual(resolveColorMode(), "256color"));
+		withEnv({ TERM: "xterm" }, () => assert.strictEqual(resolveColorMode(), "256color"));
+		withEnv({ TERM: "vt100" }, () => assert.strictEqual(resolveColorMode(), "16color"));
+		withEnv({ TERM: "xterm-16color" }, () => assert.strictEqual(resolveColorMode(), "16color"));
+		withEnv({ TERM: "linux" }, () => assert.strictEqual(resolveColorMode(), "16color"));
+		withEnv({ TERM: "xterm", COLORTERM: "truecolor" }, () => assert.strictEqual(resolveColorMode(), "truecolor"));
+		withEnv({ TERM: "xterm-256color", COLORTERM: "24bit" }, () =>
+			assert.strictEqual(resolveColorMode(), "truecolor"),
+		);
+		withEnv({ TERM: "xterm" }, () => assert.strictEqual(resolveColorMode(undefined, true), "truecolor"));
+		withEnv({ TERM: "dumb" }, () => assert.strictEqual(resolveColorMode(), "nocolor"));
+		withEnv({ TERM: "dumb", COLORTERM: "truecolor" }, () => assert.strictEqual(resolveColorMode(), "nocolor"));
+		withEnv({ NO_COLOR: "1" }, () => assert.strictEqual(resolveColorMode(), "nocolor"));
+		withEnv({ NO_COLOR: "1", COLORTERM: "truecolor" }, () => assert.strictEqual(resolveColorMode(), "nocolor"));
+		withEnv({ NO_COLOR: "" }, () => assert.strictEqual(resolveColorMode(), "256color"));
+		withEnv({ NO_COLOR: "1", PI_COLOR_MODE: "16color" }, () => assert.strictEqual(resolveColorMode(), "16color"));
+		withEnv({ TERM: "xterm-256color", PI_COLOR_MODE: "truecolor" }, () =>
+			assert.strictEqual(resolveColorMode(), "truecolor"),
+		);
+	});
+
+	it("carries the resolved colour depth in detected capabilities", () => {
+		withEnv({ TERM: "vt100" }, () => assert.strictEqual(detectCapabilities().colorMode, "16color"));
+		withEnv({ TERM: "xterm-256color" }, () => assert.strictEqual(detectCapabilities().colorMode, "256color"));
+		withEnv({ NO_COLOR: "1" }, () => assert.strictEqual(detectCapabilities().colorMode, "nocolor"));
+		withEnv({ TERM: "xterm", PI_COLOR_MODE: "nocolor" }, () =>
+			assert.strictEqual(detectCapabilities().colorMode, "nocolor"),
+		);
+		// PI_TRUE_COLOR still wins over a 256-colour TERM, and its "0" still downgrades a truecolour terminal.
+		withEnv({ TERM: "xterm-256color", PI_TRUE_COLOR: "1" }, () =>
+			assert.strictEqual(detectCapabilities().colorMode, "truecolor"),
+		);
+		withEnv({ TERM_PROGRAM: "ghostty", PI_TRUE_COLOR: "0" }, () =>
+			assert.strictEqual(detectCapabilities().colorMode, "256color"),
+		);
 	});
 
 	it("checks tmux capability when TERM starts with 'tmux'", () => {
@@ -417,7 +469,12 @@ describe("detectCapabilities", () => {
 
 	it("enables Alacritty capabilities for Zed", () => {
 		withEnv({ TERM_PROGRAM: "zed" }, () => {
-			assert.deepStrictEqual(detectCapabilities(), { images: null, trueColor: true, hyperlinks: true });
+			assert.deepStrictEqual(detectCapabilities(), {
+				images: null,
+				trueColor: true,
+				hyperlinks: true,
+				colorMode: "truecolor",
+			});
 		});
 	});
 

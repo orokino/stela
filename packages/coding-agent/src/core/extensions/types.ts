@@ -52,6 +52,7 @@ import type {
 	KeyId,
 	OverlayHandle,
 	OverlayOptions,
+	SpinnerPreset,
 	TUI,
 } from "@earendil-works/pi-tui";
 import type { Static, TSchema } from "typebox";
@@ -142,6 +143,10 @@ export interface WorkingIndicatorOptions {
 	frames?: string[];
 	/** Frame interval in milliseconds for animated indicators. */
 	intervalMs?: number;
+	/** Glyph preset; explicit frames win over the preset. */
+	preset?: SpinnerPreset;
+	/** False freezes the spinner on its first frame (reduced motion). */
+	animations?: boolean;
 }
 
 /** Wrap the current autocomplete provider with additional behavior. */
@@ -187,7 +192,7 @@ export interface ExtensionUIContext {
 	 */
 	setWorkingIndicator(options?: WorkingIndicatorOptions): void;
 
-	/** Set the label shown for hidden thinking blocks. Call with no argument to restore default. */
+	/** Deprecated: thinking collapse always shows `Thought · <duration>`; kept as a no-op for old extensions. */
 	setHiddenThinkingLabel(label?: string): void;
 
 	/** Set a widget to display above or below the editor. Accepts string array or component factory. */
@@ -513,6 +518,8 @@ export interface ToolRenderContext<TState = any, TArgs = any> {
 	 * for results stored before durations were recorded.
 	 */
 	durationMs: number | undefined;
+	/** Tool-specific result details (counts, exit codes); `undefined` while the call runs. */
+	resultDetails: unknown;
 	/** Horizontal padding configured by the outputPad setting. Renderers with `renderShell: "self"` apply it themselves. */
 	outputPad: number;
 }

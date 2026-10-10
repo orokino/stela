@@ -56,6 +56,31 @@ stela --use-theme light/dark
 
 See [CLI resources](cli.md#resources) for the command-line option.
 
+## Stela colours and terminal colour depth
+
+The built-in `stela` theme carries Stela's own palette: near-black surfaces, greyscale for structure,
+and a single accent (`#6E76FF`) reserved for actions, with success, warning and error colours for state.
+
+Stela renders at four colour depths and picks one from the environment:
+
+| Signal | Depth |
+|---|---|
+| `PI_COLOR_MODE` (`truecolor`, `256color`, `16color`, `nocolor`) | that depth, always wins |
+| `NO_COLOR` set to any non-empty value | no colour |
+| `TERM=dumb` | no colour |
+| `COLORTERM=truecolor` or `=24bit`, or a `TERM` ending in `-direct` | truecolor |
+| a terminal Stela already identified as truecolor (Kitty, Ghostty, WezTerm, Warp, iTerm2, Windows Terminal, Alacritty, VS Code, Zed) | truecolor |
+| `TERM` containing `256color` | 256 colours |
+| `TERM` of `ansi`, `linux`, `vt100`-style or `-16color` | 16 colours |
+| anything else | 256 colours |
+
+`PI_TRUE_COLOR=1` forces truecolor and `PI_TRUE_COLOR=0` caps the result at 256 colours.
+
+Only colour changes with the depth: text, spacing and layout stay byte-identical, so a capture from a
+`dumb` terminal shows the same screen as a truecolor one. At `nocolor` Stela emits no colour sequences
+at all and keeps bold, dim, italic, underline and reverse video. No state is carried by colour alone:
+every status also has a glyph or a word.
+
 ## Create a custom theme
 
 Copy one of the [built-in themes](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/src/modes/interactive/theme) or create a new JSON file conforming to the [schema](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/schemas/theme.schema.json). The built-in themes use OKHSL colors, with variables for colors that several roles share, so you can adjust a hue, saturation, or lightness directly.
@@ -117,7 +142,7 @@ Theme colors describe interface roles rather than individual components. Use the
 
 The schema is the format reference. The built-in themes provide complete values that you can copy and adjust.
 
-Five colors are optional and inherit another color when omitted:
+Seven colors are optional and inherit another color when omitted:
 
 | Optional color | Fallback |
 |---|---|
@@ -126,6 +151,8 @@ Five colors are optional and inherit another color when omitted:
 | `searchMatchBg` | `selectedBg` |
 | `searchMatchText` | `text` |
 | `thinkingMax` | `thinkingXhigh` |
+| `toolDiffAddedBg` | `toolSuccessBg` |
+| `toolDiffRemovedBg` | `toolErrorBg` |
 
 If `export` colors are omitted, Stela derives HTML page and panel backgrounds from `userMessageBg`.
 

@@ -1,6 +1,11 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
-import { detectCapabilities, getTerminalColorMode, type TerminalColorMode } from "@earendil-works/pi-tui";
+import {
+	detectCapabilities,
+	getTerminalColorMode,
+	mergeCapabilityOverrides,
+	type TerminalColorMode,
+} from "@earendil-works/pi-tui";
 import chalk from "chalk";
 import { CONFIG_DIR_NAME } from "../config.ts";
 import { loadThemeFromPath, type Theme } from "../modes/interactive/theme/theme.ts";
@@ -890,10 +895,12 @@ export class DefaultResourceLoader implements ResourceLoader {
 			themesResult = { themes: [], diagnostics: [] };
 		} else {
 			// Theme construction only needs trueColor, so skip the unrelated tmux hyperlink probe.
-			const colorMode = getTerminalColorMode({
-				...detectCapabilities(() => false),
-				...this.settingsManager.getTerminalCapabilityOverrides(),
-			});
+			const colorMode = getTerminalColorMode(
+				mergeCapabilityOverrides(
+					detectCapabilities(() => false),
+					this.settingsManager.getTerminalCapabilityOverrides(),
+				),
+			);
 			const loaded = this.loadThemes(themePaths, false, colorMode);
 			const deduped = this.dedupeThemes(loaded.themes);
 			themesResult = { themes: deduped.themes, diagnostics: [...loaded.diagnostics, ...deduped.diagnostics] };

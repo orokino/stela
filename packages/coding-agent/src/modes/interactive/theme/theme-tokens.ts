@@ -77,6 +77,16 @@ export const THEME_TOKENS = defineThemeTokens({
 	toolDiffAdded: { slot: "foreground", description: "Added lines in tool diffs" },
 	toolDiffRemoved: { slot: "foreground", description: "Removed lines in tool diffs" },
 	toolDiffContext: { slot: "foreground", description: "Context lines in tool diffs" },
+	toolDiffAddedBg: {
+		slot: "background",
+		description: "Added-line background in tool diffs, truecolor only (falls back to toolSuccessBg when omitted)",
+		fallback: "toolSuccessBg",
+	},
+	toolDiffRemovedBg: {
+		slot: "background",
+		description: "Removed-line background in tool diffs, truecolor only (falls back to toolErrorBg when omitted)",
+		fallback: "toolErrorBg",
+	},
 	syntaxComment: { slot: "foreground", description: "Syntax highlighting: comments" },
 	syntaxKeyword: { slot: "foreground", description: "Syntax highlighting: keywords" },
 	syntaxFunction: { slot: "foreground", description: "Syntax highlighting: function names" },

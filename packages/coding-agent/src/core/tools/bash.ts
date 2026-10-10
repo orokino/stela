@@ -66,6 +66,7 @@ export type BashToolOutput = Static<typeof bashOutputSchema>;
 export interface BashToolDetails {
 	truncation?: TruncationResult;
 	fullOutputPath?: string;
+	exitCode?: number;
 }
 
 /**
@@ -400,12 +401,16 @@ export function createShellToolDefinition(
 				if (exitCode !== 0) {
 					return {
 						content: [{ type: "text", text: appendStatus(outputText, `Command exited with code ${exitCode}`) }],
-						details,
+						details: { ...details, exitCode },
 						structuredContent,
 						isError: true,
 					};
 				}
-				return { content: [{ type: "text", text: outputText }], details, structuredContent };
+				return {
+					content: [{ type: "text", text: outputText }],
+					details: { ...details, exitCode },
+					structuredContent,
+				};
 			} finally {
 				clearUpdateTimer();
 			}

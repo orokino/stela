@@ -37,6 +37,7 @@ import {
 	CURSOR_MARKER,
 	compositeTuiLine,
 	dispatchMouseEvent,
+	FRAME_BYTES_CAP,
 	type OverlayHandle,
 	retargetMouseEvent,
 	TuiBase,
@@ -1688,6 +1689,11 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 		}
 		// Resolve fake cursors before highlighting and compositing, which only track SGR codes
 		let screen = this.resolveFakeCursors(nextLayout.lines.map((line) => line.replace(OSC133_ZONE_PREFIX, "")));
+		// Pathological frames (past the 7 MiB cap) rewrite as a visible `Rebuilding…` state
+		// instead of unbounded growth (OMP U14); the next frame renders normally.
+		if (screen.reduce((total, line) => total + line.length, 0) > FRAME_BYTES_CAP) {
+			screen = ["↻ Rebuilding…"];
+		}
 		screen = this.applySearchHighlights(screen, nextLayout);
 		screen = this.compositeScrollToEndIndicator(screen, nextLayout, width);
 		screen = this.compositeOverlays(screen, width, height);

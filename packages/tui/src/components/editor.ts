@@ -28,11 +28,11 @@ import { SelectList, type SelectListLayoutOptions, type SelectListTheme } from "
 const graphemeSegmenter = getGraphemeSegmenter();
 const wordSegmenter = getWordSegmenter();
 
-/** Regex matching paste markers like `[paste #1 +123 lines]` or `[paste #2 1234 chars]`. */
-const PASTE_MARKER_REGEX = /\[paste #(\d+)( (\+\d+ lines|\d+ chars))?\]/g;
+/** Regex matching paste markers like `[Pasted #1 (+123 lines)]` or `[Pasted #2 1234 chars]`. */
+const PASTE_MARKER_REGEX = /\[Pasted #(\d+)( (\(\+\d+ lines\)|\d+ chars))?\]/g;
 
 /** Non-global version for single-segment testing. */
-const PASTE_MARKER_SINGLE = /^\[paste #(\d+)( (\+\d+ lines|\d+ chars))?\]$/;
+const PASTE_MARKER_SINGLE = /^\[Pasted #(\d+)( (\(\+\d+ lines\)|\d+ chars))?\]$/;
 
 /** Check if a segment is a paste marker (i.e. was merged by segmentWithMarkers). */
 function isPasteMarker(segment: string): boolean {
@@ -52,7 +52,7 @@ function segmentWithMarkers(
 	validIds: Set<number>,
 ): Iterable<Intl.SegmentData> {
 	// Fast path: no paste markers in the text or no valid IDs.
-	if (validIds.size === 0 || !text.includes("[paste #")) {
+	if (validIds.size === 0 || !text.includes("[Pasted #")) {
 		return baseSegmenter.segment(text);
 	}
 
@@ -346,6 +346,9 @@ export class Editor implements Component, Focusable {
 	private history: string[] = [];
 	private historyIndex: number = -1; // -1 = not browsing, 0 = most recent, 1 = older, etc.
 	private historyDraft: EditorState | null = null;
+	// Incremental history search (ctrl+r, CX U7): query plus the match it resolved to.
+	private historySearchQuery: string | null = null;
+	private historySearchIndex: number = -1;
 
 	// Kill ring for Emacs-style kill/yank operations
 	private killRing = new KillRing();
@@ -488,6 +491,61 @@ export class Editor implements Component, Focusable {
 	private exitHistoryBrowsing(): void {
 		this.historyIndex = -1;
 		this.historyDraft = null;
+		this.historySearchQuery = null;
+		this.historySearchIndex = -1;
+	}
+
+	/**
+	 * Incremental history search: ctrl+r starts/restarts from the current input; typing narrows,
+	 * Enter accepts the match, Esc restores the pre-search draft (CX U7).
+	 */
+	private startHistorySearch(): void {
+		if (this.history.length === 0) return;
+		if (this.historySearchQuery === null) {
+			this.historyDraft = structuredClone(this.state);
+			this.historySearchQuery = "";
+			this.historySearchIndex = -1;
+		}
+		this.stepHistorySearch(1);
+	}
+
+	private stepHistorySearch(direction: 1 | -1): void {
+		const query = (this.historySearchQuery ?? "").toLowerCase();
+		const start = this.historySearchIndex + direction;
+		for (let i = start; i >= 0 && i < this.history.length; i += direction) {
+			if (this.history[i]!.toLowerCase().includes(query)) {
+				this.historySearchIndex = i;
+				this.historyIndex = i;
+				this.setTextInternal(this.history[i]!, "end");
+				return;
+			}
+		}
+	}
+
+	private acceptHistorySearch(): void {
+		this.historySearchQuery = null;
+		this.historySearchIndex = -1;
+		this.historyDraft = null;
+		this.historyIndex = -1;
+	}
+
+	private narrowHistorySearch(): void {
+		if (this.historySearchQuery === null) return;
+		this.historySearchQuery = this.getText();
+		this.historySearchIndex = -1;
+		this.stepHistorySearch(1);
+	}
+
+	private cancelHistorySearch(): void {
+		const draft = this.historyDraft;
+		this.historySearchQuery = null;
+		this.historySearchIndex = -1;
+		this.historyIndex = -1;
+		this.historyDraft = null;
+		if (draft) {
+			this.state = draft;
+			if (this.onChange) this.onChange(this.getText());
+		}
 	}
 
 	/** Internal setText that doesn't reset history state - used by navigateHistory */
@@ -509,6 +567,13 @@ export class Editor implements Component, Focusable {
 	}
 
 	protected renderTopBorder(width: number, hiddenLineCount: number): string {
+		if (this.historySearchQuery !== null) {
+			const match =
+				this.historySearchIndex >= 0 ? ` (${this.historySearchIndex + 1}/${this.history.length})` : " (no match)";
+			const label = `reverse-i-search: ${this.historySearchQuery}${match}`;
+			const border = `─ ${label} `.padEnd(width, "─");
+			return this.borderColor(border.slice(0, width));
+		}
 		const border = hiddenLineCount > 0 ? createScrollBorder("↑", hiddenLineCount, width) : "─".repeat(width);
 		return this.borderColor(border);
 	}
@@ -754,6 +819,22 @@ export class Editor implements Component, Focusable {
 			return;
 		}
 
+		// Incremental history search
+		if (kb.matches(data, "tui.editor.historySearch")) {
+			this.cancelAutocomplete();
+			this.startHistorySearch();
+			return;
+		}
+		if (this.historySearchQuery !== null) {
+			if (kb.matches(data, "tui.input.submit")) {
+				this.acceptHistorySearch();
+				return;
+			}
+			if (kb.matches(data, "tui.select.cancel")) {
+				this.cancelHistorySearch();
+				return;
+			}
+		}
 		// Handle autocomplete mode
 		if (this.autocompleteState && this.autocompleteList) {
 			if (kb.matches(data, "tui.select.cancel")) {
@@ -986,12 +1067,14 @@ export class Editor implements Component, Focusable {
 		const printable = decodePrintableKey(data);
 		if (printable !== undefined) {
 			this.insertCharacter(printable);
+			this.narrowHistorySearch();
 			return;
 		}
 
 		// Regular characters
 		if (data.charCodeAt(0) >= 32) {
 			this.insertCharacter(data);
+			this.narrowHistorySearch();
 		}
 	}
 
@@ -1090,7 +1173,7 @@ export class Editor implements Component, Focusable {
 	private expandPasteMarkers(text: string): string {
 		let result = text;
 		for (const [pasteId, pasteContent] of this.pastes) {
-			const markerRegex = new RegExp(`\\[paste #${pasteId}( (\\+\\d+ lines|\\d+ chars))?\\]`, "g");
+			const markerRegex = new RegExp(`\\[Pasted #${pasteId}( (\\(\\+\\d+ lines\\)|\\d+ chars))?\\]`, "g");
 			result = result.replace(markerRegex, () => pasteContent);
 		}
 		return result;
@@ -1298,19 +1381,19 @@ export class Editor implements Component, Focusable {
 		// Split into lines to check for large paste
 		const pastedLines = filteredText.split("\n");
 
-		// Check if this is a large paste (> 10 lines or > 1000 characters)
+		// Collapse pastes past CC's threshold: >800 chars or >2 lines (CC U7).
 		const totalChars = filteredText.length;
-		if (pastedLines.length > 10 || totalChars > 1000) {
+		if (pastedLines.length > 2 || totalChars > 800) {
 			// Store the paste and insert a marker
 			this.pasteCounter++;
 			const pasteId = this.pasteCounter;
 			this.pastes.set(pasteId, filteredText);
 
-			// Insert marker like "[paste #1 +123 lines]" or "[paste #1 1234 chars]"
+			// Insert marker like "[Pasted #1 (+123 lines)]" (CU U7 shape).
 			const marker =
-				pastedLines.length > 10
-					? `[paste #${pasteId} +${pastedLines.length} lines]`
-					: `[paste #${pasteId} ${totalChars} chars]`;
+				pastedLines.length > 2
+					? `[Pasted #${pasteId} (+${pastedLines.length} lines)]`
+					: `[Pasted #${pasteId} ${totalChars} chars]`;
 			this.insertTextAtCursorInternal(marker);
 			return;
 		}
@@ -1395,14 +1478,14 @@ export class Editor implements Component, Focusable {
 			const isPastedSegmented = PASTE_MARKER_SINGLE.exec(lastGrapheme.segment);
 
 			if (isPastedSegmented) {
-				// This contains the id part e.g 4 from [paste #4 +123 lines]
+				// This contains the id part e.g 4 from [Pasted #4 (+123 lines)]
 				const targetId = Number(isPastedSegmented[1]);
 				this.pastes.delete(targetId);
 				this.pasteCounter--;
 
 				// Shift registry entries down in ascending id order, independent
-				// of marker order in the text ([paste #3] becomes [paste #2] when
-				// [paste #1] is removed).
+				// of marker order in the text ([Pasted #3] becomes [Pasted #2] when
+				// [Pasted #1] is removed).
 				const higherIds = [...this.pastes.keys()].filter((id) => id > targetId).sort((a, b) => a - b);
 				for (const id of higherIds) {
 					this.pastes.set(id - 1, this.pastes.get(id)!);
@@ -1414,7 +1497,7 @@ export class Editor implements Component, Focusable {
 					line.replace(PASTE_MARKER_REGEX, (fullMatch, idGroup, suffixGroup) => {
 						const x = Number(idGroup);
 						if (x <= targetId) return fullMatch;
-						return `[paste #${x - 1}${suffixGroup}]`;
+						return `[Pasted #${x - 1}${suffixGroup}]`;
 					}),
 				);
 			}

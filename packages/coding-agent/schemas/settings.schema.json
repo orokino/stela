@@ -390,6 +390,25 @@
           "description": "Show OSC 9;4 terminal progress indicators.",
           "default": false
         },
+        "animations": {
+          "type": "boolean",
+          "description": "Animate spinners and progress indicators. Off also freezes them under TERM=dumb or without a TTY.",
+          "default": true
+        },
+        "symbols": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "unicode"
+            },
+            {
+              "type": "string",
+              "const": "ascii"
+            }
+          ],
+          "description": "Glyph set for spinners, markers, and rules. ascii suits terminals without Unicode fonts.",
+          "default": "unicode"
+        },
         "hyperlinks": {
           "anyOf": [
             {
@@ -547,7 +566,7 @@
     "autocompleteMaxVisible": {
       "type": "number",
       "description": "Maximum visible items in the autocomplete dropdown.",
-      "default": 5
+      "default": 8
     },
     "showHardwareCursor": {
       "type": "boolean",
@@ -746,6 +765,35 @@
       "description": "Cache-warming profile. \"idle\" also warms between agent runs. Global only because each refresh costs money.",
       "default": "streaming"
     },
+    "notifications": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "off"
+            },
+            {
+              "type": "string",
+              "const": "auto"
+            },
+            {
+              "type": "string",
+              "const": "bell"
+            }
+          ],
+          "description": "Desktop attention signals. auto = OSC 9 with BEL fallback; bell = BEL only.",
+          "default": "off"
+        },
+        "notifyWhenFocused": {
+          "type": "boolean",
+          "description": "Notify even while the terminal is focused. Default only notifies when unfocused.",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
     "websocketConnectTimeoutMs": {
       "anyOf": [
         {
@@ -770,7 +818,7 @@
           "const": "fullscreen"
         }
       ],
-      "default": "fullscreen"
+      "default": "regular"
     },
     "fullscreenExitOutput": {
       "anyOf": [
@@ -821,6 +869,11 @@
       ],
       "description": "Lines scrolled per wheel event in fullscreen mode; numeric values are clamped from 1 to 100.",
       "default": "auto"
+    },
+    "fullscreenMouse": {
+      "type": "boolean",
+      "description": "Capture the mouse in fullscreen mode for app-owned scroll and selection. Off keeps terminal-native copy/paste. No effect in regular TUI mode.",
+      "default": false
     },
     "queueMode": {
       "anyOf": [

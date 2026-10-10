@@ -15,12 +15,17 @@ import type { ToolDefinition, ToolRenderContext, ToolRenderers } from "../../../
 /** What this component needs from a tool: how to draw it, without executing it. */
 export type { ToolRenderers };
 
-import { formatToolCallWithArgs, getTextOutput as getRenderedTextOutput } from "../../../core/tools/render-utils.ts";
+import {
+	formatToolCallWithArgs,
+	getTextOutput as getRenderedTextOutput,
+	toolHeadStatus,
+} from "../../../core/tools/render-utils.ts";
+import { TRUNCATION_TABLE } from "../../../core/tools/truncation-table.ts";
 import { ensurePngTranscoder } from "../../../utils/image-convert.ts";
 import { theme } from "../theme/theme.ts";
 import { keyHint } from "./keybinding-hints.ts";
 
-const FALLBACK_PREVIEW_LINES = 10;
+const FALLBACK_PREVIEW_LINES = TRUNCATION_TABLE.fallbackCollapsed;
 
 export interface ToolExecutionOptions {
 	showImages?: boolean;
@@ -41,7 +46,7 @@ export class ToolExecutionComponent extends Container {
 	/** Inputs of imageComponents, so updateDisplay can reuse images and keep their converted PNG data. */
 	private imageSources: Array<{ data: string; mimeType: string; widthCells: number }> = [];
 	private imageSpacers: Spacer[] = [];
-	private toolName: string;
+	readonly toolName: string;
 	private toolCallId: string;
 	private args: any;
 	private expanded = false;
@@ -135,12 +140,19 @@ export class ToolExecutionComponent extends Container {
 			showImages: this.showImages,
 			isError: this.result?.isError ?? false,
 			durationMs: this.isPartial ? undefined : this.result?.durationMs,
+			resultDetails: this.isPartial ? undefined : this.result?.details,
 			outputPad: this.outputPad,
 		};
 	}
 
 	private createCallFallback(): Component {
-		return new Text(formatToolCallWithArgs(this.toolName, this.args, theme, this.expanded), 0, 0);
+		const status = toolHeadStatus({
+			isPartial: this.isPartial,
+			executionStarted: this.executionStarted,
+			argsComplete: this.argsComplete,
+			isError: this.result?.isError ?? false,
+		});
+		return new Text(formatToolCallWithArgs(this.toolName, this.args, theme, this.expanded, status), 0, 0);
 	}
 
 	private createResultFallback(): Component | undefined {
@@ -197,6 +209,10 @@ export class ToolExecutionComponent extends Container {
 		this.result = result;
 		this.isPartial = isPartial;
 		this.updateDisplay();
+	}
+
+	get isRunning(): boolean {
+		return this.isPartial;
 	}
 
 	setExpanded(expanded: boolean): void {

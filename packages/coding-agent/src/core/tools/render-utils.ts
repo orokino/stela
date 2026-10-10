@@ -1,7 +1,7 @@
 import * as os from "node:os";
 import { pathToFileURL } from "node:url";
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
-import { getCapabilities, getImageDimensions, hyperlink, imageFallback } from "@earendil-works/pi-tui";
+import { getCapabilities, getImageDimensions, hyperlink, imageFallback, pickSymbol } from "@earendil-works/pi-tui";
 import type { Theme } from "../../modes/interactive/theme/theme.ts";
 import { stripAnsi } from "../../utils/ansi.ts";
 import { resolvePath } from "../../utils/paths.ts";
@@ -71,12 +71,57 @@ export type ToolRenderResultLike<TDetails> = {
 const COLLAPSED_ARGS_CHARS = 100;
 
 /**
+ * Shared tool-card head: status glyph + verb + dim primary argument + meta, one line.
+ * The glyph carries the state so it survives without colour; meta words (`exit N`, durations)
+ * carry the detail. Statuses: running `●`, ok `✓`, failed `✗`.
+ */
+export function formatToolHead(options: {
+	theme: Theme;
+	status: "running" | "ok" | "error";
+	verb: string;
+	primaryArg?: string;
+	meta?: string;
+}): string {
+	const { theme, status, verb, primaryArg, meta } = options;
+	const glyph = pickSymbol(
+		status === "running" ? "●" : status === "ok" ? "✓" : "✗",
+		status === "running" ? "o" : status === "ok" ? "ok" : "fail",
+	);
+	const color = status === "running" ? "accent" : status === "ok" ? "success" : "error";
+	let head = `${theme.fg(color, glyph)} ${theme.fg("toolTitle", theme.bold(verb))}`;
+	if (primaryArg) head += ` ${theme.fg("muted", primaryArg)}`;
+	if (meta) head += ` ${theme.fg("dim", meta)}`;
+	return head;
+}
+
+/** Card status from the render context: streaming or pre-start reads as running. */
+export function toolHeadStatus(context: {
+	isPartial: boolean;
+	executionStarted: boolean;
+	argsComplete: boolean;
+	isError: boolean;
+	resultDetails?: unknown;
+	durationMs?: number;
+}): "running" | "ok" | "error" {
+	if (context.isPartial) return "running";
+	if (context.resultDetails !== undefined || context.durationMs !== undefined) return context.isError ? "error" : "ok";
+	if (!context.executionStarted && !context.argsComplete) return "running";
+	return context.isError ? "error" : "ok";
+}
+
+/**
  * Generic tool call header: the title followed by the arguments. Collapsed, they are `key=value`
  * pairs on the title line, cut to {@link COLLAPSED_ARGS_CHARS}. Expanded, each is a `key: value`
  * line below the title, with strings shown raw and continuation lines indented.
  */
-export function formatToolCallWithArgs(title: string, args: unknown, theme: Theme, expanded: boolean): string {
-	const header = theme.fg("toolTitle", theme.bold(title));
+export function formatToolCallWithArgs(
+	title: string,
+	args: unknown,
+	theme: Theme,
+	expanded: boolean,
+	status: "running" | "ok" | "error" = "running",
+): string {
+	const header = formatToolHead({ theme, status, verb: title });
 	if (args == null) return header;
 	const entries =
 		typeof args === "object" && !Array.isArray(args)

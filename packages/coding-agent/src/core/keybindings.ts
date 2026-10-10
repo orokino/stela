@@ -270,11 +270,32 @@ function isLegacyKeybindingName(key: string): key is keyof typeof KEYBINDING_NAM
 
 const validateKeybindingValue = Compile(KeybindingValueSchema);
 
+/**
+ * Keys that must keep working no matter what the user binds: rebinding them would brick
+ * interrupt, exit, paste, mode cycling, or dialog cancel (CC U10). Refused in user files.
+ */
+export const RESERVED_KEYS = [
+	"ctrl+c",
+	"ctrl+d",
+	"ctrl+v",
+	"shift+tab",
+	"escape",
+	"alt+left",
+	"alt+right",
+	"alt+up",
+	"alt+down",
+] as const;
+
+export type ReservedKey = (typeof RESERVED_KEYS)[number];
+
 function toKeybindingsConfig(value: Record<string, unknown>): KeybindingsConfig {
 	const config: KeybindingsConfig = {};
 	for (const [key, binding] of Object.entries(value)) {
 		if (key === "$schema") continue;
-		if (validateKeybindingValue.Check(binding)) config[key] = binding;
+		if (!validateKeybindingValue.Check(binding)) continue;
+		const keys = Array.isArray(binding) ? binding : [binding];
+		if (keys.some((k) => (RESERVED_KEYS as readonly unknown[]).includes(k))) continue;
+		config[key] = binding;
 	}
 	return config;
 }

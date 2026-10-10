@@ -14,6 +14,25 @@ import { StdinBuffer } from "./stdin-buffer.ts";
 const TERMINAL_PROGRESS_KEEPALIVE_MS = 1000;
 const TERMINAL_PROGRESS_ACTIVE_SEQUENCE = "\x1b]9;4;3\x07";
 const TERMINAL_PROGRESS_CLEAR_SEQUENCE = "\x1b]9;4;0\x07";
+
+/** Focus-reporting sequences; tracked so notifications can gate on unfocused-only (DV `smart`, CX). */
+const FOCUS_ENABLE = "\x1b[?1004h";
+const FOCUS_DISABLE = "\x1b[?1004l";
+const FOCUS_IN = "\x1b[I";
+const FOCUS_OUT = "\x1b[O";
+
+/**
+ * Desktop-notification escape: OSC 9 with the message, else BEL (portable subset: OMP U11, DV U11,
+ * CX U11). Control characters are stripped; overlong bodies are cut at 240 chars (CX title cap).
+ */
+export function notificationSequence(message: string, osc9 = true): string {
+	const body = message
+		.replace(/[\x00-\x1f\x7f]/g, " ")
+		.replace(/\s+/g, " ")
+		.trim()
+		.slice(0, 240);
+	return osc9 ? `\x1b]9;${body}\x07` : "\x07";
+}
 const NATIVE_SHIFT_ENTER_SEQUENCE = "\x1b[13;2u";
 const DESIRED_KITTY_KEYBOARD_PROTOCOL_FLAGS = 7;
 const KEYBOARD_PROTOCOL_RESPONSE_FRAGMENT_TIMEOUT_MS = 150;
@@ -115,6 +134,9 @@ export interface Terminal {
 	// Title operations
 	setTitle(title: string): void; // Set terminal window title
 
+	// Desktop notification (OSC 9) with BEL fallback; see `notify()`.
+	notify(message: string): void;
+
 	// Progress indicator (OSC 9;4)
 	setProgress(active: boolean): void;
 
@@ -160,6 +182,8 @@ export class ProcessTerminal implements Terminal {
 	private keyboardProtocolBufferFlushTimer?: ReturnType<typeof setTimeout>;
 	private stdinBuffer?: StdinBuffer;
 	private stdinDataHandler?: (data: string) => void;
+	/** Last focus state from ?1004 reports; null when unknown (assume focused). */
+	private terminalFocused: boolean | null = null;
 	private progressInterval?: ReturnType<typeof setInterval>;
 	/** Latest program status, kept across stop() so start() can report it again. */
 	private programStatus?: ProgramStatus;
@@ -236,6 +260,14 @@ export class ProcessTerminal implements Terminal {
 
 		// Forward individual sequences to the input handler
 		this.stdinBuffer.on("data", (sequence) => {
+			if (sequence === FOCUS_IN) {
+				this.terminalFocused = true;
+				return;
+			}
+			if (sequence === FOCUS_OUT) {
+				this.terminalFocused = false;
+				return;
+			}
 			if (isProgramStatusReply(sequence)) {
 				if (this.programStatusQueryPending) {
 					this.programStatusQueryPending = false;
@@ -571,6 +603,23 @@ export class ProcessTerminal implements Terminal {
 	setTitle(title: string): void {
 		// OSC 0;title BEL - set terminal window title
 		process.stdout.write(`\x1b]0;${title}\x07`);
+	}
+
+	notify(message: string): void {
+		process.stdout.write(notificationSequence(message, this.terminalFocused !== true));
+	}
+
+	/** Whether the terminal is known to be focused (null counts as focused: never notify blindly). */
+	isTerminalFocused(): boolean {
+		return this.terminalFocused !== false;
+	}
+
+	enableFocusReporting(): void {
+		process.stdout.write(FOCUS_ENABLE);
+	}
+
+	disableFocusReporting(): void {
+		process.stdout.write(FOCUS_DISABLE);
 	}
 
 	setProgramStatus(status: ProgramStatus): void {

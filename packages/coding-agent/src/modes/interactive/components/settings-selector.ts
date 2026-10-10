@@ -841,7 +841,7 @@ export class SettingsSelectorComponent extends Container {
 			label: "Autocomplete max items",
 			description: "Max visible items in autocomplete dropdown (3-20)",
 			currentValue: String(config.autocompleteMaxVisible),
-			values: ["3", "5", "7", "10", "15", "20"],
+			values: ["3", "5", "7", "8", "10", "15", "20"],
 		});
 
 		// Clear on shrink toggle (insert after autocomplete-max-visible)

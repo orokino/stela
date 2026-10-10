@@ -7,12 +7,12 @@
  */
 
 import { Box, Container, Spacer, Text } from "@earendil-works/pi-tui";
-import { renderDiff } from "../../../modes/interactive/components/diff.ts";
+import { countDiffLines, DIFF_COLLAPSED_LINES, renderDiff } from "../../../modes/interactive/components/diff.ts";
 import type { Theme } from "../../../modes/interactive/theme/theme.ts";
 import type { ToolDefinition } from "../../extensions/types.ts";
 import type { EditToolDetails } from "../edit.ts";
 import { computeEditsDiff, type Edit, type EditDiffError, type EditDiffResult } from "../edit-diff.ts";
-import { renderToolPath, str } from "../render-utils.ts";
+import { formatToolHead, renderToolPath, str, toolHeadStatus } from "../render-utils.ts";
 
 type EditPreview = EditDiffResult | EditDiffError;
 export type EditRenderState = {
@@ -80,9 +80,20 @@ function getRenderablePreviewInput(args: RenderableEditArgs | undefined): { path
 
 	return null;
 }
-function formatEditCall(args: RenderableEditArgs | undefined, theme: Theme, cwd: string): string {
+function formatEditCall(
+	args: RenderableEditArgs | undefined,
+	theme: Theme,
+	cwd: string,
+	status: "running" | "ok" | "error",
+	meta?: string,
+): string {
 	const pathDisplay = renderToolPath(str(args?.file_path ?? args?.path), theme, cwd);
-	return `${theme.fg("toolTitle", theme.bold("edit"))} ${pathDisplay}`;
+	return formatToolHead({ theme, status, verb: "edit", primaryArg: pathDisplay, meta });
+}
+
+function formatDiffCounts(counts: { added: number; removed: number }): string | undefined {
+	if (counts.added === 0 && counts.removed === 0) return undefined;
+	return `+${counts.added}/-${counts.removed}`;
 }
 function formatEditResult(
 	args: RenderableEditArgs | undefined,
@@ -107,7 +118,7 @@ function formatEditResult(
 
 	const resultDiff = result.details?.diff;
 	if (resultDiff && resultDiff !== previewDiff) {
-		return renderDiff(resultDiff, { filePath: rawPath ?? undefined });
+		return renderDiff(resultDiff, { filePath: rawPath ?? undefined, maxLines: DIFF_COLLAPSED_LINES });
 	}
 
 	return undefined;
@@ -134,18 +145,22 @@ function buildEditCallComponent(
 	theme: Theme,
 	cwd: string,
 	outputPad: number,
+	status: "running" | "ok" | "error",
+	meta?: string,
 ): EditCallRenderComponent {
 	component.setBgFn(getEditHeaderBg(component.preview, component.settledError, theme));
 	component.setPaddingX(outputPad);
 	component.clear();
-	component.addChild(new Text(formatEditCall(args, theme, cwd), 0, 0));
+	component.addChild(new Text(formatEditCall(args, theme, cwd, status, meta), 0, 0));
 
 	if (!component.preview) {
 		return component;
 	}
 
 	const body =
-		"error" in component.preview ? theme.fg("error", component.preview.error) : renderDiff(component.preview.diff);
+		"error" in component.preview
+			? theme.fg("error", component.preview.error)
+			: renderDiff(component.preview.diff, { maxLines: DIFF_COLLAPSED_LINES });
 	component.addChild(new Spacer(1));
 	component.addChild(new Text(body, 0, 0));
 	return component;
@@ -194,12 +209,18 @@ export const editRenderers: Pick<ToolDefinition<any, any>, "renderCall" | "rende
 			});
 		}
 
+		const meta =
+			component.preview && !("error" in component.preview)
+				? formatDiffCounts(countDiffLines(component.preview.diff))
+				: undefined;
 		return buildEditCallComponent(
 			component,
 			args as RenderableEditArgs | undefined,
 			theme,
 			context.cwd,
 			context.outputPad,
+			toolHeadStatus(context),
+			meta,
 		);
 	},
 	renderResult(result, _options, theme, context) {
@@ -223,12 +244,18 @@ export const editRenderers: Pick<ToolDefinition<any, any>, "renderCall" | "rende
 				changed = true;
 			}
 			if (changed) {
+				const rebuildMeta =
+					callComponent.preview && !("error" in callComponent.preview)
+						? formatDiffCounts(countDiffLines(callComponent.preview.diff))
+						: undefined;
 				buildEditCallComponent(
 					callComponent,
 					context.args as RenderableEditArgs | undefined,
 					theme,
 					context.cwd,
 					context.outputPad,
+					toolHeadStatus(context),
+					rebuildMeta,
 				);
 			}
 		}

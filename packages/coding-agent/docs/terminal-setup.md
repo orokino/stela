@@ -231,3 +231,7 @@ Stela reports its state with the [Program Status Protocol (OSC 7501)](https://ww
 | `idle` | Stela started, or you cancelled the run. |
 
 Reports never contain prompts or model output. Stela sends them only after the terminal answers the protocol's support query; tmux and screen do not forward them. Set `PI_PROGRAM_STATUS=1` to send reports without asking, or `PI_PROGRAM_STATUS=0` to turn them off.
+
+## Desktop notifications
+
+Off by default. Set `notifications.mode` to `auto` (OSC 9, BEL fallback) or `bell` (BEL only) to get one attention signal per turn when Stela needs input, finishes a turn, or errors. Notifications fire only while the terminal is unfocused (tracked via focus reporting, `?1004h`) unless `notifications.notifyWhenFocused` is set. Terminal support varies: iTerm2, Ghostty, WezTerm, kitty, and Windows Terminal surface OSC 9; unknown terminals ignore it and keep the BEL. The window title always shows `[Working]` or `[Ready]` regardless of this setting.

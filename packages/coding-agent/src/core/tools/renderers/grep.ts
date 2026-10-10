@@ -10,13 +10,16 @@ import { Text } from "@earendil-works/pi-tui";
 import { keyHint } from "../../../modes/interactive/components/keybinding-hints.ts";
 import type { Theme } from "../../../modes/interactive/theme/theme.ts";
 import type { ToolDefinition, ToolRenderResultOptions } from "../../extensions/types.ts";
-import type { GrepToolDetails } from "../grep.ts";
-import { getTextOutput, invalidArgText, shortenPath, str } from "../render-utils.ts";
+import type { GrepToolDetails, GrepToolInput } from "../grep.ts";
+import { formatToolHead, getTextOutput, invalidArgText, shortenPath, str, toolHeadStatus } from "../render-utils.ts";
 import { DEFAULT_MAX_BYTES, formatSize } from "../truncate.ts";
+import { TRUNCATION_TABLE } from "../truncation-table.ts";
 
 function formatGrepCall(
 	args: { pattern: string; path?: string; glob?: string; limit?: number } | undefined,
 	theme: Theme,
+	status: "running" | "ok" | "error",
+	meta?: string,
 ): string {
 	const pattern = str(args?.pattern);
 	const rawPath = str(args?.path);
@@ -24,14 +27,10 @@ function formatGrepCall(
 	const glob = str(args?.glob);
 	const limit = args?.limit;
 	const invalidArg = invalidArgText(theme);
-	let text =
-		theme.fg("toolTitle", theme.bold("grep")) +
-		" " +
-		(pattern === null ? invalidArg : theme.fg("accent", `/${pattern || ""}/`)) +
-		theme.fg("toolOutput", ` in ${path === null ? invalidArg : path}`);
-	if (glob) text += theme.fg("toolOutput", ` (${glob})`);
-	if (limit !== undefined) text += theme.fg("toolOutput", ` limit ${limit}`);
-	return text;
+	let primaryArg = `${pattern === null ? invalidArg : `/${pattern || ""}/`} in ${path === null ? invalidArg : path}`;
+	if (glob) primaryArg += ` (${glob})`;
+	if (limit !== undefined) primaryArg += ` limit ${limit}`;
+	return formatToolHead({ theme, status, verb: "grep", primaryArg, meta });
 }
 function formatGrepResult(
 	result: {
@@ -46,7 +45,7 @@ function formatGrepResult(
 	let text = "";
 	if (output) {
 		const lines = output.split("\n");
-		const maxLines = options.expanded ? lines.length : 15;
+		const maxLines = options.expanded ? lines.length : TRUNCATION_TABLE.searchCollapsed;
 		const displayLines = lines.slice(0, maxLines);
 		const remaining = lines.length - maxLines;
 		text += `\n${displayLines.map((line) => theme.fg("toolOutput", line)).join("\n")}`;
@@ -71,7 +70,13 @@ function formatGrepResult(
 export const grepRenderers: Pick<ToolDefinition<any, any>, "renderCall" | "renderResult"> = {
 	renderCall(args, theme, context) {
 		const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
-		text.setText(formatGrepCall(args as any, theme));
+		const status = toolHeadStatus(context);
+		const details = context.resultDetails as GrepToolDetails | undefined;
+		const meta =
+			details?.matchCount !== undefined
+				? `${details.matchCount} match${details.matchCount === 1 ? "" : "es"}`
+				: undefined;
+		text.setText(formatGrepCall(args as GrepToolInput | undefined, theme, status, meta));
 		return text;
 	},
 	renderResult(result, options, theme, context) {

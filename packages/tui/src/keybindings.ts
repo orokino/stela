@@ -10,6 +10,7 @@ export interface Keybindings {
 	"tui.editor.cursorDown": true;
 	"tui.editor.historyPrevious": true;
 	"tui.editor.historyNext": true;
+	"tui.editor.historySearch": true;
 	"tui.editor.cursorLeft": true;
 	"tui.editor.cursorRight": true;
 	"tui.editor.cursorWordLeft": true;
@@ -79,6 +80,10 @@ export const TUI_KEYBINDINGS = {
 		defaultKeys: [],
 		description: "Select next prompt history entry",
 	},
+	"tui.editor.historySearch": {
+		defaultKeys: "ctrl+r",
+		description: "Search prompt history",
+	},
 	"tui.editor.cursorLeft": {
 		defaultKeys: ["left", "ctrl+b"],
 		description: "Move cursor left",
@@ -140,7 +145,7 @@ export const TUI_KEYBINDINGS = {
 	"tui.editor.yank": { defaultKeys: "ctrl+y", description: "Yank" },
 	"tui.editor.yankPop": { defaultKeys: "alt+y", description: "Yank pop" },
 	"tui.editor.undo": { defaultKeys: "ctrl+-", description: "Undo" },
-	"tui.input.newLine": { defaultKeys: ["shift+enter", "ctrl+j"], description: "Insert newline" },
+	"tui.input.newLine": { defaultKeys: ["shift+enter", "ctrl+j", "alt+enter"], description: "Insert newline" },
 	"tui.input.submit": { defaultKeys: "enter", description: "Submit input" },
 	"tui.input.tab": { defaultKeys: "tab", description: "Tab / autocomplete" },
 	"tui.input.copy": { defaultKeys: "ctrl+c", description: "Copy selection" },

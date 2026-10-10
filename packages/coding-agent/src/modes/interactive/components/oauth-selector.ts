@@ -5,7 +5,10 @@ import {
 	fuzzyFilter,
 	getKeybindings,
 	Input,
+	SELECT_MARKER,
+	SELECT_SEARCH_PLACEHOLDER,
 	Spacer,
+	selectListOverflow,
 	TruncatedText,
 } from "@earendil-works/pi-tui";
 import { theme } from "../theme/theme.ts";
@@ -102,7 +105,7 @@ export class OAuthSelectorComponent extends Container implements Focusable {
 		this.addChild(new TruncatedText(theme.fg("accent", theme.bold(title)), 1, 0));
 		this.addChild(new Spacer(1));
 
-		this.searchInput = new Input();
+		this.searchInput = new Input({ placeholder: SELECT_SEARCH_PLACEHOLDER });
 		if (initialSearchInput) {
 			this.searchInput.setValue(initialSearchInput);
 		}
@@ -162,7 +165,7 @@ export class OAuthSelectorComponent extends Container implements Focusable {
 				: "";
 			let line = "";
 			if (isSelected) {
-				const prefix = theme.fg("accent", "→ ");
+				const prefix = theme.fg("accent", `${SELECT_MARKER} `);
 				const text = theme.fg("accent", provider.name);
 				line = prefix + text + authTypeLabel + statusIndicator;
 			} else {
@@ -174,8 +177,8 @@ export class OAuthSelectorComponent extends Container implements Focusable {
 		}
 
 		if (startIndex > 0 || endIndex < this.filteredProviders.length) {
-			const scrollInfo = theme.fg("muted", `  (${this.selectedIndex + 1}/${this.filteredProviders.length})`);
-			this.listContainer.addChild(new TruncatedText(scrollInfo, 1, 0));
+			const overflow = selectListOverflow(startIndex, endIndex, this.filteredProviders.length);
+			if (overflow) this.listContainer.addChild(new TruncatedText(theme.fg("muted", overflow), 1, 0));
 		}
 
 		// Show "no providers" if empty

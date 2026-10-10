@@ -42,6 +42,7 @@ import {
 	Spacer,
 	setCapabilityOverrides,
 	setKeybindings,
+	setSymbolPreset,
 	type Terminal,
 	Text,
 	TruncatedText,
@@ -152,6 +153,7 @@ import { CustomMessageComponent } from "./components/custom-message.ts";
 import { DynamicBorder } from "./components/dynamic-border.ts";
 import { EarendilAnnouncementComponent } from "./components/earendil-announcement.ts";
 import { playArmin3d, playPiLogo3d } from "./components/easter-egg-3d.lazy.ts";
+import { ExploredGroupComponent, isGroupableToolName } from "./components/explored-group.ts";
 import { ExtensionEditorComponent } from "./components/extension-editor.ts";
 import { ExtensionInputComponent } from "./components/extension-input.ts";
 import { ExtensionSelectorComponent } from "./components/extension-selector.ts";
@@ -159,6 +161,7 @@ import { FooterComponent, formatTokens } from "./components/footer.ts";
 import { formatKeyText, keyDisplayText, keyHint, keyText, rawKeyHint } from "./components/keybinding-hints.ts";
 import { LoginDialogComponent } from "./components/login-dialog.ts";
 import { createMermaidMarkdownTransformer } from "./components/mermaid.ts";
+import { messageGlyph } from "./components/message-glyphs.ts";
 import { ModelSelectorComponent } from "./components/model-selector.ts";
 import {
 	type AuthSelectorProvider,
@@ -167,7 +170,7 @@ import {
 	OAuthSelectorComponent,
 } from "./components/oauth-selector.ts";
 import { PermissionModeSelectorComponent } from "./components/permission-mode-selector.ts";
-import { piLogoLines, piWordmark, supportsPiLogo } from "./components/pi-logo.ts";
+import { piLogoLines, supportsPiLogo } from "./components/pi-logo.ts";
 import { createLoginMenuSelector } from "./components/radius-login-selector.ts";
 import { ScopedModelsSelectorComponent } from "./components/scoped-models-selector.ts";
 import { SessionSelectorComponent } from "./components/session-selector.ts";
@@ -181,6 +184,8 @@ import {
 	type StatusIndicator,
 	WorkingStatusIndicator,
 } from "./components/status-indicator.ts";
+import { STELA_STARTUP_MENU, stelaCardFits, stelaCardLines } from "./components/stela-startup-card.ts";
+import { TaskHudComponent } from "./components/task-hud.ts";
 import { ThemedText } from "./components/themed-text.ts";
 import { ThinkingSelectorComponent } from "./components/thinking-selector.ts";
 import { ToolExecutionComponent } from "./components/tool-execution.ts";
@@ -191,6 +196,7 @@ import { UserMessageSelectorComponent } from "./components/user-message-selector
 import { editInExternalEditor } from "./external-editor.ts";
 import { refreshModelCatalogs } from "./model-catalog-refresh.ts";
 import { getModelSearchText } from "./model-search.ts";
+import { Notifier } from "./notifier.ts";
 import { type BlockedStatus, dialogBlockedStatus, ProgramStatusReporter } from "./program-status-reporter.ts";
 import { shareSession } from "./session-share.ts";
 import {
@@ -461,11 +467,20 @@ export class InteractiveMode {
 	private ui: TUI;
 	private mainScreenRenderState: TuiMainScreenRenderState | undefined;
 	private loadedResourcesContainer: Container;
+	/** Last arguments for `showLoadedResources`, so ctrl+o can rebuild the same sections. */
+	private lastLoadedResourcesOptions:
+		| {
+				extensions?: Array<{ path: string; sourceInfo?: SourceInfo }>;
+				force?: boolean;
+				showDiagnosticsWhenQuiet?: boolean;
+		  }
+		| undefined;
 	private chatContainer: Container;
 	private documentContainer: Container;
 	private transcriptScrollView: TuiLayouts.ScrollView | undefined;
 	private fullscreenLayoutRoot: Component | undefined;
 	private pendingMessagesContainer: Container;
+	private taskHud: TaskHudComponent | undefined;
 	private statusContainer: Container;
 	private defaultEditor: CustomEditor;
 	private editor: ActiveEditor;
@@ -492,8 +507,6 @@ export class InteractiveMode {
 	private workingVisible = true;
 	private workingIndicatorOptions: WorkingIndicatorOptions | undefined = undefined;
 	private readonly defaultWorkingMessage = "Working";
-	private readonly defaultHiddenThinkingLabel = "Thinking...";
-	private hiddenThinkingLabel = this.defaultHiddenThinkingLabel;
 
 	private lastSigintTime = 0;
 	private lastEscapeTime = 0;
@@ -559,6 +572,13 @@ export class InteractiveMode {
 	private readonly programStatus = new ProgramStatusReporter(
 		() => this.ui.terminal,
 		() => this.sessionManager.getSessionName(),
+	);
+
+	/** Desktop attention signals (OSC 9 / BEL), off by default, one per turn. */
+	private readonly notifier = new Notifier(
+		() => this.ui.terminal,
+		() => this.settingsManager.getNotificationMode(),
+		() => this.settingsManager.getNotifyWhenFocused(),
 	);
 
 	/** The `/bug` hint is shown at most once per session so error output stays readable. */
@@ -635,6 +655,7 @@ export class InteractiveMode {
 			onRightClickPaste: this.onRightClickPaste,
 			fullscreenCopyOnSelect: this.settingsManager.getFullscreenCopyOnSelect(),
 			fullscreenWheelScrollLines: this.settingsManager.getFullscreenWheelScrollLines(),
+			fullscreenMouse: this.settingsManager.getFullscreenMouse(),
 		});
 		this.ui = createInteractiveTuiReference(() => this.renderer);
 		this.ui.setClearOnShrink(this.settingsManager.getClearOnShrink());
@@ -646,6 +667,8 @@ export class InteractiveMode {
 		this.documentContainer.addChild(this.loadedResourcesContainer);
 		this.documentContainer.addChild(this.chatContainer);
 		this.pendingMessagesContainer = new Container();
+		this.taskHud = new TaskHudComponent(this.outputPad);
+		this.pendingMessagesContainer.addChild(this.taskHud);
 		this.statusContainer = new Container();
 		this.widgetContainerAbove = new Container();
 		this.widgetContainerBelow = new Container();
@@ -923,6 +946,7 @@ export class InteractiveMode {
 			onRightClickPaste: this.onRightClickPaste,
 			fullscreenCopyOnSelect: this.settingsManager.getFullscreenCopyOnSelect(),
 			fullscreenWheelScrollLines: this.settingsManager.getFullscreenWheelScrollLines(),
+			fullscreenMouse: this.settingsManager.getFullscreenMouse(),
 		});
 		nextUi.setClearOnShrink(clearOnShrink);
 		nextUi.onDebug = onDebug;
@@ -951,6 +975,7 @@ export class InteractiveMode {
 	async init(): Promise<void> {
 		if (this.isInitialized) return;
 
+		setSymbolPreset(this.settingsManager.getSymbolPreset());
 		this.registerSignalHandlers();
 
 		// Load changelog (only show new entries, skip for resumed sessions)
@@ -1021,8 +1046,20 @@ export class InteractiveMode {
 			// app-name line instead, with the key hints below it. Forks do not display Pi's logo.
 			const showLogo = APP_NAME === "pi" && supportsPiLogo();
 			const withLogo = (hints: string) => {
-				if (!showLogo)
-					return `${APP_NAME === "pi" ? piWordmark() : theme.bold(APP_TITLE)} ${theme.fg("dim", `v${this.version}`)}\n${hints}`;
+				if (!showLogo) {
+					// Stela shows its own startup card when it fits; the hint lines stay below it.
+					if (APP_NAME !== "pi") {
+						const card = stelaCardLines({
+							title: `${APP_TITLE.charAt(0).toUpperCase()}${APP_TITLE.slice(1)}  ${this.version}`,
+							tagline: "A model-agnostic coding agent.",
+							menu: STELA_STARTUP_MENU,
+							columns: this.ui.terminal.columns,
+							rows: this.ui.terminal.rows,
+						});
+						return `${card.join("\n")}\n${hints}`;
+					}
+					return `${theme.bold(APP_TITLE)} ${theme.fg("dim", `v${this.version}`)}\n${hints}`;
+				}
 				const [top, bottom] = piLogoLines();
 				return `${top} ${theme.fg("dim", `v${this.version}`)}\n${bottom} ${hints}`;
 			};
@@ -1145,11 +1182,10 @@ export class InteractiveMode {
 	private updateTerminalTitle(): void {
 		const cwdBasename = path.basename(this.sessionManager.getCwd());
 		const sessionName = this.sessionManager.getSessionName();
-		if (sessionName) {
-			this.ui.terminal.setTitle(`${APP_TITLE} - ${sessionName} - ${cwdBasename}`);
-		} else {
-			this.ui.terminal.setTitle(`${APP_TITLE} - ${cwdBasename}`);
-		}
+		// OSC 0 always carries a state word (CX U11): Working while streaming, else Ready.
+		const state = this.session.isStreaming ? "Working" : "Ready";
+		const location = sessionName ? `${sessionName} - ${cwdBasename}` : cwdBasename;
+		this.ui.terminal.setTitle(`${APP_TITLE} [${state}] - ${location}`);
 	}
 
 	/**
@@ -1789,8 +1825,13 @@ export class InteractiveMode {
 	}): void {
 		// Resource rendering is idempotent; chat clears no longer clear this separate container.
 		this.loadedResourcesContainer.clear();
+		this.lastLoadedResourcesOptions = options;
 
-		const showListing = options?.force || this.shouldShowStartupDetails();
+		// With the startup card on screen the resource lists stay behind ctrl+o, so a fresh start shows
+		// the card and one hint line only (the Grok Build framing).
+		const cardShown = APP_NAME !== "pi" && stelaCardFits(this.ui.terminal.columns, this.ui.terminal.rows);
+		const showListing =
+			options?.force || (this.shouldShowStartupDetails() && (!cardShown || this.getStartupExpansionState()));
 		const showDiagnostics = showListing || options?.showDiagnosticsWhenQuiet === true;
 		if (!showListing && !showDiagnostics) {
 			return;
@@ -2371,7 +2412,7 @@ export class InteractiveMode {
 			new WorkingStatusIndicator(
 				this.ui,
 				this.workingMessage ?? this.defaultWorkingMessage,
-				this.workingIndicatorOptions,
+				{ ...this.workingIndicatorOptions, animations: this.settingsManager.getAnimationsEnabled() },
 				colorFn,
 			),
 		);
@@ -2398,17 +2439,9 @@ export class InteractiveMode {
 		this.ui.requestRender();
 	}
 
-	private setHiddenThinkingLabel(label?: string): void {
-		this.hiddenThinkingLabel = label ?? this.defaultHiddenThinkingLabel;
-		for (const child of this.chatContainer.children) {
-			if (child instanceof AssistantMessageComponent) {
-				child.setHiddenThinkingLabel(this.hiddenThinkingLabel);
-			}
-		}
-		if (this.streamingComponent) {
-			this.streamingComponent.setHiddenThinkingLabel(this.hiddenThinkingLabel);
-		}
-		this.ui.requestRender();
+	private setHiddenThinkingLabel(_label?: string): void {
+		// No-op: thinking collapse always shows `Thought · <duration>`. The extension API keeps the
+		// method so old extensions still load.
 	}
 
 	/**
@@ -2746,7 +2779,7 @@ export class InteractiveMode {
 			this.ui.setFocus(this.extensionSelector);
 			// Extension dialogs share the editor slot: opening one replaces the status of a displaced one.
 			this.programStatus.setBlocked("extension-dialog", blocked);
-			this.ui.requestRender();
+			this.notifier.notify("needs-input", blocked.message);
 		});
 	}
 
@@ -2827,7 +2860,7 @@ export class InteractiveMode {
 			this.editorContainer.addChild(this.extensionInput);
 			this.ui.setFocus(this.extensionInput);
 			this.programStatus.setBlocked("extension-dialog", dialogBlockedStatus(title, opts));
-			this.ui.requestRender();
+			this.notifier.notify("needs-input", title);
 		});
 	}
 
@@ -3385,9 +3418,11 @@ export class InteractiveMode {
 						return;
 					}
 					this.editor.addToHistory?.(text);
+					this.updatePendingMessagesDisplay();
 					await this.handleBashCommand(command, isExcluded);
 					this.isBashMode = false;
 					this.updateEditorBorderColor();
+					this.updatePendingMessagesDisplay();
 					return;
 				}
 			}
@@ -3445,6 +3480,8 @@ export class InteractiveMode {
 		switch (event.type) {
 			case "agent_start":
 				this.pendingTools.clear();
+				this.notifier.turnStarted();
+				this.updateTerminalTitle();
 				// Restore main escape handler if retry handler is still active
 				// (retry success event fires later, but we need main handler now)
 				if (this.retryEscapeHandler) {
@@ -3541,10 +3578,11 @@ export class InteractiveMode {
 						undefined,
 						this.hideThinkingBlock,
 						this.getMarkdownThemeWithSettings(),
-						this.hiddenThinkingLabel,
 						this.outputPad,
 						this.getMarkdownTransformers(),
 					);
+					this.streamingComponent.setThinkingLiveInvalidator(() => this.ui.requestRender());
+					this.streamingComponent.setThinkingAnimations(this.settingsManager.getAnimationsEnabled());
 					this.streamingMessage = event.message;
 					this.chatContainer.addChild(this.streamingComponent);
 					this.streamingComponent.updateContent(this.streamingMessage, true);
@@ -3555,6 +3593,9 @@ export class InteractiveMode {
 			case "message_update":
 				if (this.streamingComponent && event.message.role === "assistant") {
 					this.streamingMessage = event.message;
+					if (event.assistantMessageEvent.type === "thinking_start") {
+						this.streamingComponent.setThinkingStartedAt(performance.now());
+					}
 					this.streamingComponent.updateContent(this.streamingMessage, true);
 
 					for (const content of this.streamingMessage.content) {
@@ -3601,6 +3642,7 @@ export class InteractiveMode {
 								: "Operation aborted";
 						this.streamingMessage.errorMessage = errorMessage;
 					}
+					this.streamingComponent.setThinkingStartedAt(undefined);
 					this.streamingComponent.updateContent(this.streamingMessage, false);
 
 					if (this.streamingMessage.stopReason === "aborted" || this.streamingMessage.stopReason === "error") {
@@ -3631,7 +3673,8 @@ export class InteractiveMode {
 				break;
 
 			case "bash_execution_update":
-				// The bash execution callback handles TUI output rendering.
+				// The bash execution callback handles TUI output rendering; refresh the HUD clocks.
+				this.updatePendingMessagesDisplay();
 				break;
 
 			case "tool_execution_start": {
@@ -3692,6 +3735,9 @@ export class InteractiveMode {
 					this.streamingMessage = undefined;
 				}
 				this.pendingTools.clear();
+				this.groupExploredRuns();
+				this.notifier.notify(event.willRetry ? "error" : "turn-complete");
+				this.updateTerminalTitle();
 
 				this.ui.requestRender();
 				break;
@@ -3866,7 +3912,7 @@ export class InteractiveMode {
 
 		const spacer = new Spacer(1);
 		this.lastStatusMessage = message;
-		const text = new ThemedText(() => theme.fg("dim", this.lastStatusMessage), 1, 0);
+		const text = new ThemedText(() => theme.fg("dim", `${messageGlyph("notice")} ${this.lastStatusMessage}`), 1, 0);
 		this.chatContainer.addChild(spacer);
 		this.chatContainer.addChild(text);
 		this.lastStatusSpacer = spacer;
@@ -4002,7 +4048,6 @@ export class InteractiveMode {
 					message,
 					this.hideThinkingBlock,
 					this.getMarkdownThemeWithSettings(),
-					this.hiddenThinkingLabel,
 					this.outputPad,
 					this.getMarkdownTransformers(),
 				);
@@ -4110,7 +4155,53 @@ export class InteractiveMode {
 		for (const [toolCallId, component] of renderedPendingTools) {
 			this.pendingTools.set(toolCallId, component);
 		}
+		this.groupExploredRuns();
 		this.ui.requestRender();
+	}
+
+	/**
+	 * Collapse every run of 3+ finished read/search cards separated only by assistant rows into one
+	 * `Explored — …` line. Multi-step turns interleave one assistant row per tool call, so a strict
+	 * consecutive scan never matches; skipping those separators mirrors CC's `collapsed_read_search`
+	 * render case (CC U4), which folds read/search runs out of the message stream.
+	 * Runs at agent end and after history rebuilds.
+	 */
+	private groupExploredRuns(): void {
+		const children = this.chatContainer.children;
+		let i = 0;
+		while (i < children.length) {
+			const child = children[i];
+			if (!(child instanceof ToolExecutionComponent) || !isGroupableToolName(child.toolName)) {
+				i++;
+				continue;
+			}
+			const run: ToolExecutionComponent[] = [child];
+			let end = i;
+			let j = i + 1;
+			while (j < children.length) {
+				const next = children[j];
+				if (next instanceof ToolExecutionComponent && isGroupableToolName(next.toolName)) {
+					run.push(next);
+					end = j;
+					j++;
+				} else if (next instanceof AssistantMessageComponent && this.isEmptyAssistantRow(next)) {
+					j++;
+				} else {
+					break;
+				}
+			}
+			if (run.length >= 3 && run.every((card) => !card.isRunning)) {
+				const group = new ExploredGroupComponent(run, this.outputPad, this.toolOutputExpanded);
+				children.splice(i, end - i + 1, group);
+				end = i;
+			}
+			i = end + 1;
+		}
+	}
+
+	/** An assistant row with no visible text or thinking (a bare streaming shell between tool calls). */
+	private isEmptyAssistantRow(row: AssistantMessageComponent): boolean {
+		return row.render(this.ui.terminal.columns).every((line) => line.trim() === "");
 	}
 
 	/**
@@ -4664,6 +4755,8 @@ export class InteractiveMode {
 				}
 			}
 		}
+		// The startup card hides the resource lists while collapsed, so re-render them on toggle.
+		this.showLoadedResources(this.lastLoadedResourcesOptions);
 		this.showStatus(`Tool output: ${expanded ? "expanded" : "collapsed"}`);
 	}
 
@@ -4713,13 +4806,17 @@ export class InteractiveMode {
 
 	showError(errorMessage: string): void {
 		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(new ThemedText(() => theme.fg("error", `Error: ${errorMessage}`), this.outputPad, 0));
+		this.chatContainer.addChild(
+			new ThemedText(() => theme.fg("error", `${messageGlyph("error")} Error: ${errorMessage}`), this.outputPad, 0),
+		);
 		this.ui.requestRender();
 	}
 
 	showWarning(warningMessage: string): void {
 		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(new ThemedText(() => theme.fg("warning", `Warning: ${warningMessage}`), 1, 0));
+		this.chatContainer.addChild(
+			new ThemedText(() => theme.fg("warning", `${messageGlyph("warning")} Warning: ${warningMessage}`), 1, 0),
+		);
 		this.ui.requestRender();
 	}
 
@@ -4813,9 +4910,14 @@ export class InteractiveMode {
 
 	private updatePendingMessagesDisplay(): void {
 		this.pendingMessagesContainer.clear();
+		if (this.taskHud) this.pendingMessagesContainer.addChild(this.taskHud);
+		this.updateTaskHud();
 		const { steering: steeringMessages, followUp: followUpMessages } = this.getAllQueuedMessages();
-		if (steeringMessages.length > 0 || followUpMessages.length > 0) {
+		const total = steeringMessages.length + followUpMessages.length;
+		if (total > 0) {
 			this.pendingMessagesContainer.addChild(new Spacer(1));
+			// Dock head: `N queued` count (DV/CU U7) above the per-message rows.
+			this.pendingMessagesContainer.addChild(new TruncatedText(theme.fg("dim", `${total} queued`), 1, 0));
 			for (const message of steeringMessages) {
 				const text = theme.fg("dim", `Steering: ${message}`);
 				this.pendingMessagesContainer.addChild(new TruncatedText(text, 1, 0));
@@ -4825,9 +4927,20 @@ export class InteractiveMode {
 				this.pendingMessagesContainer.addChild(new TruncatedText(text, 1, 0));
 			}
 			const dequeueHint = this.getAppKeyDisplay("app.message.dequeue");
-			const hintText = theme.fg("dim", `↳ ${dequeueHint} to edit all queued messages`);
+			const hintText = theme.fg("dim", `↳ ${dequeueHint} to edit all queued messages · ⏎ send now on interrupt`);
 			this.pendingMessagesContainer.addChild(new TruncatedText(hintText, 1, 0));
 		}
+	}
+
+	/** Refresh the pinned shell rows from live `!`/`!!` executions. */
+	private updateTaskHud(): void {
+		this.taskHud?.setShells(
+			this.session.runningShells.map((shell, index) => ({
+				name: `shell ${index + 1}`,
+				command: shell.command,
+				startedAt: shell.startedAt,
+			})),
+		);
 	}
 
 	private restoreQueuedMessagesToEditor(options?: { abort?: boolean; currentText?: string }): number {
@@ -7138,6 +7251,7 @@ export class InteractiveMode {
 			this.chatContainer.addChild(this.bashComponent);
 		}
 		this.ui.requestRender();
+		this.updatePendingMessagesDisplay();
 
 		try {
 			const result = await this.session.executeBash(
@@ -7145,6 +7259,7 @@ export class InteractiveMode {
 				(chunk) => {
 					if (this.bashComponent) {
 						this.bashComponent.appendOutput(chunk);
+						this.updatePendingMessagesDisplay();
 						this.ui.requestRender();
 					}
 				},
@@ -7167,6 +7282,7 @@ export class InteractiveMode {
 		}
 
 		this.bashComponent = undefined;
+		this.updatePendingMessagesDisplay();
 		this.ui.requestRender();
 	}
 

@@ -39,6 +39,7 @@ export type ReadToolOutput = Static<typeof readOutputSchema>;
 
 export interface ReadToolDetails {
 	truncation?: TruncationResult;
+	lineCount?: number;
 }
 
 /**
@@ -202,6 +203,7 @@ export function createReadToolDefinition(
 									outputText = truncation.content;
 								}
 								content = [{ type: "text", text: outputText }];
+								details = { ...details, lineCount: truncation.outputLines };
 							}
 
 							if (aborted) return;

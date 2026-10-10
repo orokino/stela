@@ -27,6 +27,8 @@ A configured value replaces the default for that action. Use an empty list to di
 
 After editing the file, run `/reload` to apply the changes to the active session.
 
+Reserved keys cannot be rebound: `ctrl+c`, `ctrl+d`, `ctrl+v`, `shift+tab`, `escape`, `alt+left`, `alt+right`, `alt+up`, `alt+down`. Entries using them are ignored so interrupt, exit, paste, mode cycling, and dialog cancel keep working.
+
 ## Key syntax
 
 Write a key as `modifier+key`. Modifiers are `ctrl`, `shift`, `alt`, and `super`. You can combine modifiers. Valid keys are:
@@ -84,7 +86,7 @@ The dedicated history actions browse prompt history regardless of cursor positio
 
 | Keybinding id | Default | Description |
 |---|---|---|
-| `tui.input.newLine` | `shift+enter`, `ctrl+j` | Insert new line |
+| `tui.input.newLine` | `shift+enter`, `ctrl+j`, `alt+enter` | Insert new line |
 | `tui.input.submit` | `enter` | Submit input |
 | `tui.input.tab` | `tab` | Tab or autocomplete |
 | `tui.input.copy` | `ctrl+c` | Copy selection |

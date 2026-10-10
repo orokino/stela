@@ -1,5 +1,8 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { KEYBINDINGS, useWindowsKeybindings } from "../src/core/keybindings.ts";
+import { KEYBINDINGS, KeybindingsManager, RESERVED_KEYS, useWindowsKeybindings } from "../src/core/keybindings.ts";
 
 describe("Windows keybinding defaults", () => {
 	it("uses Windows keybindings on native Windows", () => {
@@ -38,5 +41,32 @@ describe("Windows keybinding defaults", () => {
 			windowsKeybindings ? "ctrl+down" : ["ctrl+shift+down", "ctrl+down"],
 		);
 		expect(KEYBINDINGS["app.message.dequeue"].defaultKeys).toBe(windowsKeybindings ? "alt+q" : "alt+up");
+	});
+});
+
+describe("reserved keys", () => {
+	it("lists the keys rebinding cannot take", () => {
+		expect([...RESERVED_KEYS]).toEqual([
+			"ctrl+c",
+			"ctrl+d",
+			"ctrl+v",
+			"shift+tab",
+			"escape",
+			"alt+left",
+			"alt+right",
+			"alt+up",
+			"alt+down",
+		]);
+	});
+
+	it("refuses reserved keys from user files but keeps the rest", () => {
+		const dir = mkdtempSync(join(tmpdir(), "stela-keys-"));
+		writeFileSync(
+			join(dir, "keybindings.json"),
+			JSON.stringify({ "app.model.select": "ctrl+c", "app.tools.expand": "ctrl+e" }),
+		);
+		const manager = KeybindingsManager.create(dir);
+		expect(manager.getKeys("app.model.select")).not.toContain("ctrl+c");
+		expect(manager.getKeys("app.tools.expand")).toContain("ctrl+e");
 	});
 });

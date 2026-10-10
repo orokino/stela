@@ -99,6 +99,7 @@ export class VirtualTerminal implements Terminal {
 		// OSC 0;title BEL - set terminal window title
 		this.xterm.write(`\x1b]0;${title}\x07`);
 	}
+	notify(_message: string): void {}
 
 	setProgress(_active: boolean): void {}
 	setProgramStatus(): void {}

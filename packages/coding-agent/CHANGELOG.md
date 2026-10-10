@@ -8,6 +8,8 @@
 - Moved the thinking-level cycle from `Shift+Tab` to `Alt+T`; `Shift+Tab` now cycles the permission mode. Both stay rebindable (`app.thinking.cycle`, `app.permissions.cycle`).
 - Removed the `plan-mode` example extension; plan mode is built in.
 - Cut over this fork to the `stela` command, `~/.stela/agent` global state, `.stela` project configuration, and Stela-specific directory overrides. Pi state is not imported automatically; upstream package names and persistence formats are retained.
+- Collapsed thinking blocks always render as `+ Thought · <duration>` with a live spinner row (`Thinking… <elapsed>`, ticking from `thinking_start`); `ctx.ui.setHiddenThinkingLabel()` is a no-op kept so old extensions still load, and the `hidden-thinking-label` example extension is removed.
+- Changed the default TUI mode from fullscreen to regular (inline): the transcript stays in real terminal scrollback; fullscreen remains available via `--tui-mode fullscreen` or the `tuiMode` setting, with the mouse off unless `fullscreenMouse` is enabled.
 
 ### Added
 
@@ -18,6 +20,20 @@
 - Added the `kind` option to extension `select()` and `input()` dialogs. `kind: "permission"` reports the dialog to the terminal as a permission prompt (OSC 7501) with only the first line of its title; the tool approval dialog uses it.
 - Added `ctx.permissions` (`getMode()`, `setMode()`) and the `permission_mode_change` event for extensions. `ctx.permissions` is undefined when the session has no permission gate. Extensions cannot change rules or grants; `tool_call` handlers still run before the gate, which checks the final arguments. An extension tool that replaces `exit_plan_mode` is gated like any other tool.
 - Added a Node-based checkout launcher and non-overwriting per-user installer for `stela`; existing global `pi` installations remain separate.
+- Added a terminal colour-depth ladder: `truecolor`, `256color`, `16color`, and `nocolor`, chosen from `PI_COLOR_MODE`, `NO_COLOR`, `TERM=dumb`, `COLORTERM`, the terminal identity, and `TERM`. Text and layout are identical at every depth; at `nocolor` no colour sequences are emitted and bold, dim, italic, underline and reverse video remain. `PI_TRUE_COLOR` still forces or caps truecolor.
+- Added the built-in `stela` theme with the fork's own palette: near-black surfaces, greyscale structure, `#6E76FF` accent for actions, and status colours for state.
+- Added transcript notice glyphs that survive without colour: status, warning, and error rows carry `ⓘ`, `⚠`, and `■` next to their word label. User rows stay a plain tinted block with no gutter.
+- Added a shared tool-card head: status glyph (`●` running, `✓` ok, `✗` failed) + verb + dim primary argument + meta (duration, `exit N`, match counts). Bash durations moved from the body footer into the head. Runs of 3+ finished read/search cards collapse to one `Explored — N reads, N searches` line, expanded by `ctrl+o` or click.
+- Added inline diff grammar: sign gutter with per-side line numbers, word-level inverse highlight only for 1↔1 pairs under a 40% change gate, dim `⋮` hunk breaks, per-file `+N/-M` counts in the edit head, collapse past 40 lines / 8 hunks, and truecolor-only add/remove backgrounds (`toolDiffAddedBg`/`toolDiffRemovedBg`).
+- Added a footer context segment (`◫ pct/window`, auto-compact `⟲`) with glyph + word + colour warnings (`high` past 70%, `critical` past 90%), a documented narrow-width drop order, and a streaming right side (spinner + `Working (<key> to interrupt)` from the live binding). The spinner is Cursor's 8-frame two-cell braille set at 250 ms, shared by the loader, footer, and thinking row.
+- Added spinner presets (`unicode`, `nerd`, `ascii`) and animation suppression: loaders and the live thinking row freeze on their first frame when `terminal.animations` is false, on `TERM=dumb`, or without a TTY. Extension `setWorkingIndicator()` accepts the preset.
+- Added shared select-list grammar: `❯` selection marker and `✔` current mark, `↑/↓ N more` overflow rows, fuzzy filtering, `No items` / `No matching items` empty states, description column capped at 40%, and a `Type to search` placeholder across model, session, scoped-model, and provider pickers.
+- Added composer paste collapse past 800 chars or 2 lines into `[Pasted #N (+M lines)]`, `ctrl+r` incremental history search with a `reverse-i-search` border prompt, a `N queued` dock head with edit/send-now hints, `@`/`/` popups capped at 8 rows by default, and `alt+enter` as a third newline key.
+- Added a reserved-keys list (`ctrl+c/d`, `ctrl+v`, `shift+tab`, `escape`, `alt+arrows`) refused in user keybinding files, and a `fullscreenMouse` setting (default off): the mouse is never captured unless explicitly enabled in fullscreen mode.
+- Added opt-in desktop notifications (`notifications.mode`: `off`/`auto`/`bell`): one OSC 9 (or BEL) per turn for needs-input, turn-complete, and error, gated on unfocused terminals via `?1004h` unless `notifyWhenFocused` is set. The OSC 0 title always carries `[Working]`/`[Ready]`; OSC 7501 semantics are unchanged.
+- Added a `terminal.symbols` preset (`unicode`/`ascii`): ASCII renders `>`/`*` markers, `^/v N more`, `|/-\` spinner, `ok`/`fail`/`o` tool states, `i`/`!`/`x` notices, `ctx` + `(auto)` footer, `:` hunk breaks, and `-` dashes across every surface from steps 1–11.
+- Added a shared truncation table for all tool surfaces, a 30 fps frame budget, and a 7 MiB frame cap that rewrites pathological frames as a visible `Rebuilding…` state instead of growing unbounded. Large shell output keeps its `Full output: <path>` spool marker.
+- Added a pinned task HUD above the composer for running `!`/`!!` shells (capped at 3 rows, warning colour after 5 s, ASCII-aware). Todo strip, subagent rows, and the tabbed tray stay future: Stela ships no todo/subagent tool yet.
 
 ### Changed
 

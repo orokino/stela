@@ -73,6 +73,8 @@ const TOKEN_FAMILIES: Record<ThemeToken, FamilyName> = {
 	toolPendingBg: "neutral",
 	toolSuccessBg: "green",
 	toolErrorBg: "red",
+	toolDiffAddedBg: "green",
+	toolDiffRemovedBg: "red",
 
 	text: "neutral",
 	userMessageText: "neutral",

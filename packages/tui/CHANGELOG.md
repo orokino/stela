@@ -5,10 +5,16 @@
 ### Breaking Changes
 
 - `Editor.render()` and `Input.render()` now wrap the drawn cursor in zero-width APC markers instead of emitting `\x1b[7m` directly. TUI renderers resolve them; code that renders these components outside a TUI must strip them, for example with `stripTerminalSequences()`
+- `Terminal` implementations must provide `notify(message)`; terminals without notification support can implement it as a no-op
 
 ### Added
 
 - Added `renderFakeCursor()`. Components wrap their drawn cursor with it, and the TUI renders it in reverse video, or omits it after `CURSOR_MARKER` when `showHardwareCursor` is enabled
+- Added a terminal colour-depth ladder: `truecolor`, `256color`, `16color`, and `nocolor`, with `NO_COLOR` and `TERM=dumb` honoured. Text and layout are identical at every depth; at `nocolor` no colour sequences are emitted
+- Added spinner presets (`unicode`, `nerd`, `ascii`) sharing Cursor's two-cell braille art at 250 ms, plus `animationsAllowed()` suppression (setting, `TERM=dumb`, non-TTY) and a `terminal.symbols` preset (`unicode`/`ascii`) with `pickSymbol()` glyph resolution
+- Added shared select-list grammar: `❯`/`✔` markers, `↑/↓ N more` overflow rows, fuzzy filtering, and a height clamp
+- Added `tui.editor.historySearch` (`ctrl+r`) incremental history search and `alt+enter` as a third newline key; large pastes collapse past 800 chars or 2 lines into `[Pasted #N (+M lines)]`
+- Added `Terminal.notify()` (OSC 9 with BEL fallback), `?1004h` focus tracking, a 30 fps frame budget, and a 7 MiB frame cap that rewrites pathological frames as `Rebuilding…`
 
 ### Changed
 

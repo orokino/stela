@@ -10,18 +10,25 @@ import { Text } from "@earendil-works/pi-tui";
 import { keyHint } from "../../../modes/interactive/components/keybinding-hints.ts";
 import type { Theme } from "../../../modes/interactive/theme/theme.ts";
 import type { ToolDefinition, ToolRenderResultOptions } from "../../extensions/types.ts";
-import type { LsToolDetails } from "../ls.ts";
-import { getTextOutput, renderToolPath, str } from "../render-utils.ts";
+import type { LsToolDetails, LsToolInput } from "../ls.ts";
+import { formatToolHead, getTextOutput, renderToolPath, str, toolHeadStatus } from "../render-utils.ts";
 import { DEFAULT_MAX_BYTES, formatSize } from "../truncate.ts";
+import { TRUNCATION_TABLE } from "../truncation-table.ts";
 
-function formatLsCall(args: { path?: string; limit?: number } | undefined, theme: Theme, cwd: string): string {
+function formatLsCall(
+	args: { path?: string; limit?: number } | undefined,
+	theme: Theme,
+	cwd: string,
+	status: "running" | "ok" | "error",
+	meta?: string,
+): string {
 	const limit = args?.limit;
 	const pathDisplay = renderToolPath(str(args?.path), theme, cwd, { emptyFallback: "." });
-	let text = `${theme.fg("toolTitle", theme.bold("ls"))} ${pathDisplay}`;
+	let primaryArg = pathDisplay;
 	if (limit !== undefined) {
-		text += theme.fg("toolOutput", ` (limit ${limit})`);
+		primaryArg += ` (limit ${limit})`;
 	}
-	return text;
+	return formatToolHead({ theme, status, verb: "ls", primaryArg, meta });
 }
 function formatLsResult(
 	result: {
@@ -36,7 +43,7 @@ function formatLsResult(
 	let text = "";
 	if (output) {
 		const lines = output.split("\n");
-		const maxLines = options.expanded ? lines.length : 20;
+		const maxLines = options.expanded ? lines.length : TRUNCATION_TABLE.findCollapsed;
 		const displayLines = lines.slice(0, maxLines);
 		const remaining = lines.length - maxLines;
 		text += `\n${displayLines.map((line) => theme.fg("toolOutput", line)).join("\n")}`;
@@ -59,7 +66,13 @@ function formatLsResult(
 export const lsRenderers: Pick<ToolDefinition<any, any>, "renderCall" | "renderResult"> = {
 	renderCall(args, theme, context) {
 		const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
-		text.setText(formatLsCall(args as any, theme, context.cwd));
+		const status = toolHeadStatus(context);
+		const details = context.resultDetails as LsToolDetails | undefined;
+		const meta =
+			details?.entryCount !== undefined
+				? `${details.entryCount} ${details.entryCount === 1 ? "entry" : "entries"}`
+				: undefined;
+		text.setText(formatLsCall(args as LsToolInput | undefined, theme, context.cwd, status, meta));
 		return text;
 	},
 	renderResult(result, options, theme, context) {

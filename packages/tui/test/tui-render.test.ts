@@ -61,6 +61,7 @@ class BoundedWriteTerminal implements Terminal {
 	clearFromCursor(): void {}
 	clearScreen(): void {}
 	setTitle(_title: string): void {}
+	notify(_message: string): void {}
 	setProgress(_active: boolean): void {}
 	setProgramStatus(): void {}
 }
